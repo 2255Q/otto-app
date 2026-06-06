@@ -70,6 +70,7 @@
         <button type="button" onclick="importUrl()" style="padding:10px 16px;border:none;border-radius:10px;background:var(--ink);color:#fff;font-weight:600;font-size:14px;cursor:pointer;white-space:nowrap">Import</button>
       </div>
       <div id="importStatus" style="font-size:12px;color:var(--gray);margin-top:6px;min-height:15px"></div>
+      <div id="importPhotos"></div>
     </div>
     <div style="height:1px;background:var(--line);margin:2px 0 16px"></div>
     <div class="form-row">
@@ -233,10 +234,32 @@ function renderPack(pack){
   window.scrollTo({top:0,behavior:'smooth'});
 }
 
+function renderPhotos(images){
+  const box=document.getElementById('importPhotos'); box.innerHTML='';
+  if(!images || !images.length) return;
+  const head=document.createElement('div'); head.style.cssText='font-size:12px;font-weight:600;margin:10px 0 6px;color:var(--ink)';
+  head.textContent='📸 '+images.length+' photo'+(images.length>1?'s':'')+' found — tap a photo to open & save';
+  box.appendChild(head);
+  const grid=document.createElement('div'); grid.style.cssText='display:flex;flex-wrap:wrap;gap:6px';
+  images.forEach(u=>{
+    const a=document.createElement('a'); a.href=u; a.target='_blank'; a.rel='noopener';
+    const img=document.createElement('img'); img.src=u; img.loading='lazy';
+    img.style.cssText='width:66px;height:50px;object-fit:cover;border-radius:6px;border:1px solid var(--line);display:block';
+    img.onerror=function(){ a.remove(); };
+    a.appendChild(img); grid.appendChild(a);
+  });
+  box.appendChild(grid);
+  const btn=document.createElement('button'); btn.type='button'; btn.textContent='Copy photo links';
+  btn.style.cssText='margin-top:8px;padding:7px 14px;border:1px solid var(--line);border-radius:980px;background:#fff;font-size:12px;font-weight:600;cursor:pointer;color:var(--accent)';
+  btn.onclick=function(){ const t=images.join('\n'); if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(t).then(()=>{ btn.textContent='✓ Copied'; setTimeout(()=>{btn.textContent='Copy photo links';},1500); }).catch(()=>{}); } };
+  box.appendChild(btn);
+}
+
 async function importUrl(){
   const url=(document.getElementById('importUrl').value||'').trim();
   const st=document.getElementById('importStatus');
   const btn=document.getElementById('importUrl').nextElementSibling;
+  document.getElementById('importPhotos').innerHTML='';
   if(!url){ st.style.color='var(--gray)'; st.textContent='Paste a dealer listing link first.'; return; }
   st.style.color='var(--gray)'; st.textContent='🔎 Reading the listing…'; if(btn) btn.disabled=true;
   try{
@@ -246,7 +269,9 @@ async function importUrl(){
       const v=data.vehicle, set=(id,val)=>{const el=document.getElementById(id); if(el && val) el.value=val;};
       set('year',v.year);set('make',v.make);set('model',v.model);set('trim',v.trim);
       set('miles',v.miles);set('price',v.price);set('color',v.color);set('features',v.features);
-      st.style.color='var(--ok)'; st.textContent='✓ Imported — check the details, then Generate.';
+      renderPhotos(data.images);
+      const n=(data.images||[]).length;
+      st.style.color='var(--ok)'; st.textContent='✓ Imported'+(n?(' with '+n+' photo'+(n>1?'s':'')):'')+' — check the details, then Generate.';
     } else {
       st.style.color='#d4537e'; st.textContent='Couldn’t read that page — just fill the details in below.';
     }
