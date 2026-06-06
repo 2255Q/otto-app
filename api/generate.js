@@ -1,13 +1,21 @@
-// Otto — AI post-pack generator (Vercel serverless function)
+// Otto — AI post-pack generator (Vercel serverless function, powered by Claude)
 // Security/cost notes:
-//  - The API key lives ONLY in process.env.OPENAI_API_KEY (set in Vercel, never sent to the browser).
+//  - The API key lives ONLY in process.env.ANTHROPIC_API_KEY (set in Vercel, never sent to the browser).
 //  - Inputs are length-capped to bound token usage; output is capped via max_tokens.
 //  - On any error or missing key we return {ok:true, fallback:true} so the frontend
 //    gracefully uses its built-in template engine instead of breaking.
 
 const FIELD_MAX = 200;
-const MODEL = 'gpt-4o-mini';   // cheapest capable model — ~$0.001 per generation
-const MAX_TOKENS = 900;        // hard cap on output cost per call
+const MODEL = 'claude-haiku-4-5-20251001'; // cheap, fast, excellent copy — ~$0.007 per generation
+const MAX_TOKENS = 900;                    // hard cap on output cost per call
+
+function extractJSON(t) {
+  if (!t) return null;
+  let s = String(t).trim().replace(/^```json/i, '').replace(/^```/, '').replace(/```$/, '').trim();
+  const a = s.indexOf('{'), b = s.lastIndexOf('}');
+  if (a >= 0 && b > a) s = s.slice(a, b + 1);
+  try { return JSON.parse(s); } catch (e) { return null; }
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -26,7 +34,7 @@ export default async function handler(req, res) {
   const len = Number(req.headers['content-length'] || 0);
   if (len > 4096) { res.status(413).json({ ok: false, error: 'too_large' }); return; }
 
-  const key = process.env.OPENAI_API_KEY;
+  const key = process.env.ANTHROPIC_API_KEY;
   if (!key) {
     // No key configured yet → tell the frontend to use its built-in engine.
     res.status(200).json({ ok: true, fallback: true });
@@ -48,7 +56,7 @@ export default async function handler(req, res) {
       return;
     }
 
-    const system = "You are an expert automotive social-media copywriter writing on behalf of an individual car salesperson. Write punchy, authentic, ready-to-post marketing copy that sounds like a real person, not a brochure. Rules: never invent specs, features, or claims that were not provided; stay honest and compliant (no guarantees, no false urgency about safety, no discriminatory language); keep it concise. Respond with ONLY a valid JSON object.";
+    const system = "You are an expert automotive social-media copywriter writing on behalf of an individual car salesperson. Write punchy, authentic, ready-to-post marketing copy that sounds like a real person, not a brochure. Rules: never invent specs, features, or claims that were not provided; stay honest and compliant (no guarantees, no false urgency about safety, no discriminatory language); keep it concise. Respond with ONLY a single valid JSON object and nothing else — no markdown, no code fences, no commentary.";
 
     const user = `Write a social-media post pack for this vehicle. Desired tone: ${v.tone}.
 
@@ -73,15 +81,19 @@ Return a JSON object with EXACTLY these keys:
 
 Only use the contact info that was provided. Do not fabricate anything not listed above.`;
 
-    const aiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+    const aiRes = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json' },
+      headers: {
+        'x-api-key': key,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json'
+      },
       body: JSON.stringify({
         model: MODEL,
-        messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
-        temperature: 0.8,
         max_tokens: MAX_TOKENS,
-        response_format: { type: 'json_object' }
+        temperature: 0.8,
+        system,
+        messages: [{ role: 'user', content: user }]
       })
     });
 
@@ -91,10 +103,9 @@ Only use the contact info that was provided. Do not fabricate anything not liste
     }
 
     const j = await aiRes.json();
-    const content = j && j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
-    let result;
-    try { result = JSON.parse(content || '{}'); }
-    catch (e) { res.status(200).json({ ok: true, fallback: true }); return; }
+    const text = j && j.content && j.content[0] && j.content[0].text;
+    const result = extractJSON(text);
+    if (!result) { res.status(200).json({ ok: true, fallback: true }); return; }
 
     res.status(200).json({ ok: true, result });
   } catch (e) {
