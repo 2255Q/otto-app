@@ -343,16 +343,28 @@ const IMG_JUNK = /logo|icon|sprite|badge|banner|button|captcha|placeholder|blank
 function extractImages(html, baseUrl, seed) {
   const found = [];
   const push = (raw) => {
-    const u = resolveUrl(raw, baseUrl);
+    let u = resolveUrl(raw, baseUrl);
     if (!u) return;
     if (!/\.(jpe?g|png|webp)(\?|$)/i.test(u) && !/\/(photo|image|img|inventory|vehicle)/i.test(u)) return;
     if (IMG_JUNK.test(u)) return;
+    // Strip query params from direct image files: resize policies like
+    // ?impolicy=resize can return 1x1 placeholders; the bare file is the original.
+    if (/\.(jpe?g|png|webp)\?/i.test(u)) u = u.split('?')[0];
     found.push(u);
   };
 
-  (seed || []).forEach(push);
+  // Highest priority: dealer.com tags real vehicle photos with
+  // "provider":"ACTUAL_PHOTO" in its inline JSON — these are never banners.
+  const actualPhotoRe = /"([^"]{10,300}?\.(?:jpe?g|png|webp))(?:\?[^"]*)?"\s*,\s*"provider"\s*:\s*"ACTUAL_PHOTO"/gi;
+  let ap;
+  const actualPhotos = [];
+  while ((ap = actualPhotoRe.exec(html)) !== null) actualPhotos.push(ap[1].replace(/\\\//g, '/'));
+  actualPhotos.forEach(push);
+  const hasActual = found.length > 0;
 
-  const patterns = [
+  if (!hasActual) (seed || []).forEach(push);
+
+  const patterns = hasActual ? [] : [
     /<img[^>]+(?:data-src|data-lazy-src|data-original)=["']([^"']+)["']/gi,
     /<img[^>]+src=["']([^"']+)["']/gi,
     /"(?:imageUrl|image_url|photoUrl|photo_url)"\s*:\s*"([^"]+)"/gi,
@@ -363,7 +375,7 @@ function extractImages(html, baseUrl, seed) {
     while ((m = p.exec(html)) !== null) push(m[1]);
   }
 
-  // Dedupe, preferring larger-looking variants (strip size params for the key)
+  // Dedupe (queries already stripped for direct files)
   const seen = new Set();
   const out = [];
   for (const u of found) {
@@ -449,34 +461,39 @@ export default async function handler(req, res) {
 
     // Manual redirect loop: each hop's URL is re-validated (host + resolved IP)
     // so a public page can't bounce us to an internal/metadata address.
+    // Bot-protection (Akamai etc.) blocks intermittently — retry once on 403/429/503.
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
     let fetchRes;
-    let currentUrl = listingUrl;
     try {
-      for (let hop = 0; hop < 5; hop++) {
-        fetchRes = await fetch(currentUrl, {
-          signal: controller.signal,
-          redirect: 'manual',
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.9'
+      for (let attempt = 0; attempt < 2; attempt++) {
+        let currentUrl = listingUrl;
+        for (let hop = 0; hop < 5; hop++) {
+          fetchRes = await fetch(currentUrl, {
+            signal: controller.signal,
+            redirect: 'manual',
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+              'Accept-Language': 'en-US,en;q=0.9'
+            }
+          });
+          if (![301, 302, 303, 307, 308].includes(fetchRes.status)) break;
+          const loc = fetchRes.headers.get('location');
+          if (!loc) break;
+          const next = new URL(loc, currentUrl).href;
+          if (!isPublicHttpUrl(next) || !(await hostResolvesPublic(new URL(next).hostname))) {
+            res.status(400).json({ ok: false, error: 'unsafe_redirect', message: 'That link redirected somewhere we can\'t fetch. Please fill in details manually.' });
+            return;
           }
-        });
-        if (![301, 302, 303, 307, 308].includes(fetchRes.status)) break;
-        const loc = fetchRes.headers.get('location');
-        if (!loc) break;
-        const next = new URL(loc, currentUrl).href;
-        if (!isPublicHttpUrl(next) || !(await hostResolvesPublic(new URL(next).hostname))) {
-          res.status(400).json({ ok: false, error: 'unsafe_redirect', message: 'That link redirected somewhere we can\'t fetch. Please fill in details manually.' });
-          return;
+          currentUrl = next;
+          if (hop === 4) { // too many redirects
+            res.status(422).json({ ok: false, error: 'too_many_redirects', message: 'That page redirected too many times. Please fill in details manually.' });
+            return;
+          }
         }
-        currentUrl = next;
-        if (hop === 4) { // too many redirects
-          res.status(422).json({ ok: false, error: 'too_many_redirects', message: 'That page redirected too many times. Please fill in details manually.' });
-          return;
-        }
+        if (!fetchRes || ![403, 429, 503].includes(fetchRes.status) || attempt === 1) break;
+        await new Promise(r => setTimeout(r, 900)); // brief pause, then one retry
       }
     } finally {
       clearTimeout(timer);
