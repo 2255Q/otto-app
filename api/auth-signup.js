@@ -55,7 +55,7 @@ export default async function handler(req, res) {
       return;
     }
 
-    // Password minimum length (adjust as needed)
+    // Password minimum length (enforce 6-character minimum as per requirement)
     if (password.length < 6) {
       res.status(400).json({ ok: false, message: 'password_too_short' });
       return;
