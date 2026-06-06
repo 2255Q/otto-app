@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Otto — Listing Studio</title>
+<style>
+  :root{
+    --ink:#1d1d1f; --gray:#6e6e73; --line:#e6e6e8; --bg:#f5f5f7; --card:#fff;
+    --accent:#0071e3; --accent-dark:#0058b9; --grad:linear-gradient(120deg,#6a5cff,#0071e3 60%,#00c2ff);
+    --radius:16px; --ok:#1a9d54;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;line-height:1.5;padding-bottom:60px}
+  a{color:inherit}
+  .top{position:sticky;top:0;z-index:20;background:rgba(255,255,255,.8);backdrop-filter:saturate(180%) blur(20px);border-bottom:1px solid var(--line)}
+  .top-in{max-width:1100px;margin:0 auto;display:flex;align-items:center;gap:10px;padding:13px 20px}
+  .mark{width:26px;height:26px;border-radius:8px;background:var(--grad);display:grid;place-items:center;color:#fff;font-weight:800;font-size:15px}
+  .brand{font-weight:700;font-size:17px;letter-spacing:-.02em}
+  .brand span{color:var(--gray);font-weight:500}
+  .wrap{max-width:1100px;margin:0 auto;padding:22px 20px;display:grid;grid-template-columns:380px 1fr;gap:24px;align-items:start}
+  @media(max-width:840px){.wrap{grid-template-columns:1fr;padding:16px}}
+
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:20px}
+  .panel h2{font-size:15px;letter-spacing:-.01em;margin-bottom:4px}
+  .panel .hint{font-size:12.5px;color:var(--gray);margin-bottom:16px}
+  .form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .field{margin-bottom:13px}
+  label{display:block;font-size:12px;font-weight:600;margin-bottom:5px;color:#3d3d40}
+  input,select,textarea{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;font-size:14px;font-family:inherit;background:#fafafa;transition:.15s}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);background:#fff}
+  textarea{resize:vertical;min-height:60px}
+  .gen-btn{width:100%;margin-top:6px;padding:14px;border:none;border-radius:12px;background:var(--accent);color:#fff;font-size:15px;font-weight:600;cursor:pointer;transition:.15s}
+  .gen-btn:hover{background:var(--accent-dark)}
+  .gen-btn:active{transform:scale(.99)}
+
+  .out-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px}
+  .out-head h2{font-size:18px;letter-spacing:-.02em}
+  .regen{padding:9px 16px;border:1px solid var(--line);border-radius:980px;background:#fff;font-size:13px;font-weight:600;cursor:pointer}
+  .regen:hover{border-color:var(--accent);color:var(--accent)}
+  .empty{background:var(--card);border:1px dashed var(--line);border-radius:var(--radius);padding:48px 24px;text-align:center;color:var(--gray)}
+  .empty .big{font-size:34px;margin-bottom:10px}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 16px 14px;margin-bottom:14px}
+  .card-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+  .chan{display:flex;align-items:center;gap:8px;font-weight:650;font-size:13.5px}
+  .chan .dot{width:9px;height:9px;border-radius:50%}
+  .copy{padding:6px 13px;border:1px solid var(--line);border-radius:980px;background:#fff;font-size:12px;font-weight:600;cursor:pointer;color:var(--accent)}
+  .copy.done{background:var(--ok);color:#fff;border-color:var(--ok)}
+  .body{font-size:13.5px;white-space:pre-wrap;color:#2b2b2e;background:#fafafa;border:1px solid var(--line);border-radius:10px;padding:12px;max-height:none}
+  .ttl{font-weight:700;font-size:14px;margin-bottom:6px}
+  .tags{font-size:13px;color:var(--accent);word-spacing:2px}
+  .foot{max-width:1100px;margin:8px auto 0;padding:0 20px;font-size:12px;color:var(--gray)}
+  .pill{display:inline-block;background:#eef4ff;color:var(--accent);font-size:11px;font-weight:700;padding:3px 9px;border-radius:980px;margin-left:8px;vertical-align:middle}
+</style>
+</head>
+<body>
+<div class="top"><div class="top-in"><span class="mark">O</span><span class="brand">Otto <span>· Listing Studio</span></span><span class="pill">v0.1</span></div></div>
+
+<div class="wrap">
+  <!-- INPUT -->
+  <div class="panel">
+    <h2>Vehicle details</h2>
+    <p class="hint">Fill this in once — Otto writes every post for you.</p>
+    <div class="form-row">
+      <div class="field"><label>Year</label><input id="year" placeholder="2021" /></div>
+      <div class="field"><label>Make</label><input id="make" placeholder="Jeep" /></div>
+    </div>
+    <div class="form-row">
+      <div class="field"><label>Model</label><input id="model" placeholder="Cherokee" /></div>
+      <div class="field"><label>Trim</label><input id="trim" placeholder="Latitude 4WD" /></div>
+    </div>
+    <div class="form-row">
+      <div class="field"><label>Mileage</label><input id="miles" placeholder="42,000" /></div>
+      <div class="field"><label>Price ($)</label><input id="price" placeholder="23,995" /></div>
+    </div>
+    <div class="form-row">
+      <div class="field"><label>Exterior color</label><input id="color" placeholder="Silver" /></div>
+      <div class="field"><label>Condition</label>
+        <select id="cond"><option>Excellent</option><option>Clean / well-kept</option><option>Certified pre-owned</option><option>Good</option></select>
+      </div>
+    </div>
+    <div class="field"><label>Key features (comma separated)</label>
+      <textarea id="features" placeholder="Backup camera, Apple CarPlay, heated seats, one owner, new tires"></textarea>
+    </div>
+    <div class="form-row">
+      <div class="field"><label>Your name</label><input id="rep" placeholder="Alex" /></div>
+      <div class="field"><label>Your phone / text</label><input id="phone" placeholder="(555) 123-4567" /></div>
+    </div>
+    <div class="form-row">
+      <div class="field"><label>City / market</label><input id="city" placeholder="Dallas" /></div>
+      <div class="field"><label>Tone</label>
+        <select id="tone"><option value="friendly">Friendly</option><option value="hype">Hype / energetic</option><option value="pro">Professional</option><option value="fun">Fun / playful</option></select>
+      </div>
+    </div>
+    <button class="gen-btn" onclick="generate()">✨ Generate post pack</button>
+  </div>
+
+  <!-- OUTPUT -->
+  <div>
+    <div class="out-head">
+      <h2>Your post pack</h2>
+      <button class="regen" id="regenBtn" onclick="generate()" style="display:none">↻ Regenerate variations</button>
+    </div>
+    <div id="output">
+      <div class="empty"><div class="big">🚗</div>Enter a vehicle and hit <strong>Generate</strong>.<br/>Otto will write ready-to-post copy for every channel.</div>
+    </div>
+  </div>
+</div>
+<div class="foot">Otto Listing Studio — AI-written, unique every time. Falls back to the built-in engine if AI is unavailable. Always review before posting.</div>
+
+<script>
+const pick = a => a[Math.floor(Math.random()*a.length)];
+const val = id => document.getElementById(id).value.trim();
+function money(p){ p=(p||'').replace(/[^0-9.]/g,''); return p? '$'+Number(p).toLocaleString() : ''; }
+function milesFmt(m){ m=(m||'').replace(/[^0-9]/g,''); return m? Number(m).toLocaleString()+' miles' : ''; }
+
+function vehicleName(){
+  const y=val('year'),mk=val('make'),md=val('model'),tr=val('trim');
+  return [y,mk,md,tr].filter(Boolean).join(' ');
+}
+function featureList(){ return val('features').split(',').map(s=>s.trim()).filter(Boolean); }
+
+const HOOKS={
+  friendly:['Just hit the lot and it won’t last 👇','Take a look at this one 👇','Got something clean for you 👇','This one checks all the boxes 👇'],
+  hype:['🚨 THIS JUST IN 🚨','🔥 You need to see this one 🔥','Stop scrolling. 🛑 Look at this.','⚡ Fresh on the lot and priced to MOVE ⚡'],
+  pro:['Now available:','Newly listed:','Available for immediate delivery:','Just added to inventory:'],
+  fun:['Your next car called. It wants to come home. 🚗💨','Warning: may cause uncontrollable smiling 😎','POV: you pull up in this 👀','New whip alert! 🚗✨']
+};
+const CTAS={
+  friendly:['DM me “{kw}” and I’ll send details + set up a test drive.','Message me to come see it — easy, no pressure.','Text me and I’ll hold it for you.'],
+  hype:['DM “{kw}” NOW before it’s gone 🏃','Text me ASAP — these move fast 🔑','Slide in my DMs and it’s yours 🔥'],
+  pro:['Contact me to schedule a test drive or discuss financing.','Reach out for full details and availability.','Message me to arrange a viewing.'],
+  fun:['DM “{kw}” and let’s make it official 💍','Text me — your driveway is looking empty 👀','Hit me up before someone else does 😏']
+};
+
+function buildPack(){
+  const name=vehicleName(), mk=val('make'), md=val('model'), price=money(val('price')),
+    miles=milesFmt(val('miles')), color=val('color'), cond=val('cond'),
+    feats=featureList(), rep=val('rep'), phone=val('phone'), city=val('city'), tone=val('tone');
+  const kw=(md||mk||'CAR').toUpperCase().replace(/[^A-Z0-9]/g,'');
+  const cta=pick(CTAS[tone]).replace('{kw}',kw);
+  const hook=pick(HOOKS[tone]);
+  const sign=rep?`— ${rep}${phone?` · ${phone}`:''}`:'';
+  const featLine=feats.length?feats.slice(0,6).map(f=>'✔ '+f).join('\n'):'';
+  const featInline=feats.length?feats.slice(0,5).join(' · '):'';
+  const specs=[miles,color?color+' exterior':'',cond].filter(Boolean).join(' · ');
+
+  // Marketplace
+  const mpTitle=[name,price].filter(Boolean).join(' — ');
+  const mp=`${name}${color?` in ${color}`:''}${miles?`, ${miles}`:''}.\n\n${cond} condition${price?`. Priced at ${price}.`:'.'}\n${featLine?`\nWhat you get:\n${featLine}\n`:''}\n${cta}${city?` Located in ${city}.`:''}\n${sign}`;
+
+  // Facebook / IG feed
+  const fb=`${hook}\n\n${name}${price?` — ${price}`:''}\n${specs}\n${featInline?`\n${featInline}\n`:''}\n${cta}\n${sign}`;
+
+  // Reel / Story (short)
+  const reel=`${name} 🚗${price?`\nOnly ${price}`:''}${miles?`\n${miles}`:''}\n\n${cta}`;
+
+  // TikTok
+  const tk=`${pick(HOOKS[tone])}\n${name}${price?` for ${price}`:''} ${miles?`with just ${miles}`:''} 🤝\n${featInline?featInline+' ':''}\n${cta} ${sign}`;
+
+  // Craigslist (plainer)
+  const cl=`${name} — ${price||'call for price'}\n\n${[miles,color,cond+' condition'].filter(Boolean).join(' | ')}\n${feats.length?'\nFeatures:\n- '+feats.join('\n- ')+'\n':''}\nClean and ready to go.${city?` Located in ${city}.`:''}\nContact ${rep||'me'}${phone?` at ${phone}`:''} to see it.`;
+
+  // Hashtags
+  const base=['#'+(mk||'cars').replace(/\s/g,''),md?'#'+md.replace(/\s/g,''):'', city?'#'+city.replace(/\s/g,'')+'Cars':'','#usedcars','#carsforsale','#carsales','#carsalesman','#'+(val('year')||'')+(mk||''),'#dealership','#testdrive','#cardeals'];
+  const tags=base.filter(t=>t&&t.length>1).slice(0,12).join(' ');
+
+  return [
+    {chan:'Facebook Marketplace',color:'#1877f2',title:mpTitle,body:mp},
+    {chan:'Facebook / Instagram post',color:'#e1306c',body:fb},
+    {chan:'Reel / Story caption',color:'#a259ff',body:reel},
+    {chan:'TikTok caption',color:'#000',body:tk},
+    {chan:'Craigslist',color:'#5b21b6',body:cl},
+    {chan:'Hashtags',color:'#0071e3',tags:tags}
+  ];
+}
+
+// escape ALL dynamic content before it touches innerHTML (prevents XSS + garbled output)
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function collectInputs(){
+  const ids=['year','make','model','trim','miles','price','color','cond','features','rep','phone','city','tone'];
+  const o={}; ids.forEach(id=>o[id]=val(id).slice(0,200)); return o;
+}
+
+// map the AI JSON response into the same shape buildPack() returns
+function mapAI(d){
+  return [
+    {chan:'Facebook Marketplace',color:'#1877f2',title:d.marketplaceTitle||'',body:d.marketplace||''},
+    {chan:'Facebook / Instagram post',color:'#e1306c',body:d.facebook||''},
+    {chan:'Reel / Story caption',color:'#a259ff',body:d.reel||''},
+    {chan:'TikTok caption',color:'#000',body:d.tiktok||''},
+    {chan:'Craigslist',color:'#5b21b6',body:d.craigslist||''},
+    {chan:'Hashtags',color:'#0071e3',tags:Array.isArray(d.hashtags)?d.hashtags.join(' '):(d.hashtags||'')}
+  ];
+}
+
+function fallbackCopy(text,cb){
+  const ta=document.createElement('textarea'); ta.value=text; ta.style.position='fixed'; ta.style.opacity='0';
+  document.body.appendChild(ta); ta.focus(); ta.select();
+  try{ document.execCommand('copy'); cb&&cb(); }catch(e){}
+  document.body.removeChild(ta);
+}
+
+function renderPack(pack){
+  const out=document.getElementById('output'); out.innerHTML='';
+  pack.forEach(c=>{
+    const div=document.createElement('div'); div.className='card';
+    const content = c.tags ? `<div class="tags">${esc(c.tags)}</div>`
+      : `${c.title?`<div class="ttl">${esc(c.title)}</div>`:''}<div class="body">${esc(c.body)}</div>`;
+    div.innerHTML=`<div class="card-top"><div class="chan"><span class="dot" style="background:${esc(c.color)}"></span>${esc(c.chan)}</div>`+
+      `<button class="copy">Copy</button></div>${content}`;
+    out.appendChild(div);
+    const text = c.tags ? c.tags : (c.title? c.title+'\n\n'+c.body : c.body);
+    div.querySelector('.copy').addEventListener('click',function(){
+      const btn=this, done=()=>{btn.textContent='✓ Copied';btn.classList.add('done');setTimeout(()=>{btn.textContent='Copy';btn.classList.remove('done');},1500);};
+      if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(text).then(done).catch(()=>fallbackCopy(text,done)); }
+      else { fallbackCopy(text,done); }
+    });
+  });
+  document.getElementById('regenBtn').style.display='inline-block';
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+async function generate(){
+  if(!vehicleName()){ alert('Add at least a year/make/model so Otto knows the car.'); return; }
+  const btn=document.querySelector('.gen-btn'); const lbl=btn.innerHTML;
+  btn.textContent='✨ Writing your posts…'; btn.disabled=true;
+  let pack=null;
+  try{
+    const res=await fetch('/api/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(collectInputs())});
+    if(res.ok){
+      const data=await res.json();
+      if(data && data.ok && !data.fallback && data.result){ pack=mapAI(data.result); }
+    }
+  }catch(e){ /* no backend / offline → use built-in engine */ }
+  if(!pack){ pack=buildPack(); }   // graceful fallback: never leaves the user stuck
+  renderPack(pack);
+  btn.innerHTML=lbl; btn.disabled=false;
+}
+</script>
+</body>
+</html>
