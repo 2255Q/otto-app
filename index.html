@@ -1128,6 +1128,62 @@
     subscriptionState = { plan_tier: null, status: null, email: null };
   }
 
+  // Authenticated fetch with automatic session refresh.
+  // Supabase access tokens expire after ~1 hour; on a 401 we refresh the
+  // session once and retry, so the salesperson never gets logged out mid-work.
+  let refreshInFlight = null;
+  async function refreshSession() {
+    if (refreshInFlight) return refreshInFlight; // de-dupe concurrent refreshes
+    refreshInFlight = (async () => {
+      try {
+        const rt = authState.session && authState.session.refresh_token;
+        if (!rt) return false;
+        const res = await fetch('/api/auth/refresh', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refresh_token: rt }),
+        });
+        if (!res.ok) return false;
+        const data = await res.json();
+        if (!data.session || !data.session.access_token) return false;
+        authState.user = data.user || authState.user;
+        authState.session = data.session;
+        localStorage.setItem('otto_session', JSON.stringify(authState));
+        return true;
+      } catch (e) {
+        return false;
+      } finally {
+        refreshInFlight = null;
+      }
+    })();
+    return refreshInFlight;
+  }
+
+  async function authedFetch(url, opts) {
+    const doFetch = () => fetch(url, {
+      ...(opts || {}),
+      headers: {
+        ...((opts && opts.headers) || {}),
+        'Authorization': 'Bearer ' + (authState.session ? authState.session.access_token : ''),
+      },
+    });
+    let res = await doFetch();
+    if (res.status === 401) {
+      const refreshed = await refreshSession();
+      if (refreshed) {
+        res = await doFetch();
+      } else {
+        // Session truly dead — send them back to sign-in
+        clearAuth();
+        showStatus('Your session expired — please sign in again.', 'error');
+        document.getElementById('authGate').classList.add('active');
+        document.getElementById('appNav').style.display = 'none';
+        document.getElementById('appContainer').classList.remove('active');
+      }
+    }
+    return res;
+  }
+
   async function handleSignIn() {
     const email = document.getElementById('authEmail').value.trim();
     const password = document.getElementById('authPassword').value.trim();
@@ -1234,11 +1290,7 @@
     if (!authState.user) return;
 
     try {
-      const res = await fetch('/api/subscription/status', {
-        headers: {
-          'Authorization': 'Bearer ' + authState.session.access_token,
-        },
-      });
+      const res = await authedFetch('/api/subscription/status');
 
       if (!res.ok) {
         console.error('Failed to fetch subscription status');
@@ -1316,12 +1368,9 @@
     if (!authState.user) return;
 
     try {
-      const res = await fetch('/api/checkout', {
+      const res = await authedFetch('/api/checkout', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + authState.session.access_token,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ plan_tier: tier }),
       });
 
@@ -1375,12 +1424,9 @@
       btn.disabled = true;
       btn.textContent = 'Scraping...';
 
-      const res = await fetch('/api/scrape-listing', {
+      const res = await authedFetch('/api/scrape-listing', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + authState.session.access_token,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url }),
       });
 
@@ -1456,12 +1502,9 @@
       btn.textContent = 'Generating...';
 
       // Generate text content
-      const textRes = await fetch('/api/generate', {
+      const textRes = await authedFetch('/api/generate', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + authState.session.access_token,
-        },
+        headers: { 'Content-Type': 'application/json' },
         // Backend field names: miles (not mileage), cond (not history),
         // rep/phone = salesperson attribution for CTAs and sign-offs.
         body: JSON.stringify({
@@ -1480,12 +1523,9 @@
       let imageUrl = null;
       if (!appState.scrapedImages || appState.scrapedImages.length === 0) {
         try {
-          const imageRes = await fetch('/api/generate-image', {
+          const imageRes = await authedFetch('/api/generate-image', {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer ' + authState.session.access_token,
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ year, make, model, color, trim }),
           });
           if (imageRes.ok) {
@@ -1617,9 +1657,7 @@
     const prev = btn && btn.textContent;
     if (btn) { btn.disabled = true; btn.textContent = '…'; }
     try {
-      const res = await fetch('/api/download-image?src=' + encodeURIComponent(url), {
-        headers: { 'Authorization': 'Bearer ' + authState.session.access_token },
-      });
+      const res = await authedFetch('/api/download-image?src=' + encodeURIComponent(url));
       if (!res.ok) throw new Error('download failed');
       const blob = await res.blob();
       const a = document.createElement('a');
