@@ -347,9 +347,11 @@ function extractImages(html, baseUrl, seed) {
     if (!u) return;
     if (!/\.(jpe?g|png|webp)(\?|$)/i.test(u) && !/\/(photo|image|img|inventory|vehicle)/i.test(u)) return;
     if (IMG_JUNK.test(u)) return;
-    // Strip query params from direct image files: resize policies like
-    // ?impolicy=resize can return 1x1 placeholders; the bare file is the original.
+    // Strip query params from direct image files (lazyload variants can be
+    // 1x1 placeholders), then request a full-size rendition from known CDNs:
+    // pictures.dealer.com defaults to a 110px thumbnail without these params.
     if (/\.(jpe?g|png|webp)\?/i.test(u)) u = u.split('?')[0];
+    if (/pictures\.dealer\.com/i.test(u)) u += '?impolicy=resize&w=1024';
     found.push(u);
   };
 

@@ -1551,13 +1551,18 @@
         .filter(img => /^https?:\/\//i.test(String(img)))
         .slice(0, 6); // Show up to 6 images
       imagesHtml = imageUrls.length === 0 ? '' : `<div style="margin-bottom: 24px;">
-        <p style="font-size: 12px; color: var(--gray); margin-bottom: 12px;">Car Images (from dealership)</p>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <p style="font-size: 12px; color: var(--gray); margin: 0;">Car photos (from dealership) — save them, then attach to your post</p>
+          <button id="dlAllBtn" class="btn btn-ghost" style="font-size: 12px; padding: 6px 12px;">⬇ Download all</button>
+        </div>
         <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
           ${imageUrls.map((img, idx) => `
-            <div data-img-cell style="aspect-ratio: 4/3; overflow: hidden; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+            <div data-img-cell style="position: relative; aspect-ratio: 4/3; overflow: hidden; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
               <img src="${escAttr(img)}" alt="Car image ${idx + 1}" style="width: 100%; height: 100%; object-fit: cover;"
                 onerror="this.closest('[data-img-cell]').style.display='none'"
-                onload="if(this.naturalWidth<50)this.closest('[data-img-cell]').style.display='none'"/>
+                onload="if(this.naturalWidth<200)this.closest('[data-img-cell]').style.display='none'"/>
+              <button data-dl="${escAttr(img)}" data-dl-idx="${idx + 1}" title="Save this photo"
+                style="position: absolute; right: 8px; bottom: 8px; border: 0; border-radius: 8px; padding: 6px 10px; font-size: 12px; font-weight: 600; background: rgba(255,255,255,0.92); cursor: pointer;">⬇ Save</button>
             </div>
           `).join('')}
         </div>
@@ -1581,12 +1586,55 @@
         imageContainer.setAttribute('data-image-container', 'true');
         imageContainer.innerHTML = imagesHtml;
         outputHeader.insertAdjacentElement('afterend', imageContainer);
+
+        // Wire up photo downloads
+        imageContainer.querySelectorAll('[data-dl]').forEach(btn => {
+          btn.addEventListener('click', () =>
+            downloadCarImage(btn.getAttribute('data-dl'), btn.getAttribute('data-dl-idx'), btn));
+        });
+        const dlAll = imageContainer.querySelector('#dlAllBtn');
+        if (dlAll) dlAll.addEventListener('click', async () => {
+          dlAll.disabled = true; dlAll.textContent = 'Downloading…';
+          const btns = [...imageContainer.querySelectorAll('[data-dl]')]
+            .filter(b => b.closest('[data-img-cell]').style.display !== 'none');
+          for (const b of btns) {
+            await downloadCarImage(b.getAttribute('data-dl'), b.getAttribute('data-dl-idx'), null);
+            await new Promise(r => setTimeout(r, 400)); // let the browser register each download
+          }
+          dlAll.disabled = false; dlAll.textContent = '⬇ Download all';
+          showStatus('Photos downloaded! Attach them when you post.', 'success');
+        });
       }
     }
 
     outputContent.style.display = 'block';
     emptyState.style.display = 'none';
     displayPackGrid(data.pack || []);
+  }
+
+  // Download a dealership photo via our proxy (browsers block cross-origin saves)
+  async function downloadCarImage(url, idx, btn) {
+    const prev = btn && btn.textContent;
+    if (btn) { btn.disabled = true; btn.textContent = '…'; }
+    try {
+      const res = await fetch('/api/download-image?src=' + encodeURIComponent(url), {
+        headers: { 'Authorization': 'Bearer ' + authState.session.access_token },
+      });
+      if (!res.ok) throw new Error('download failed');
+      const blob = await res.blob();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'car-photo-' + (idx || 1) + '.jpg';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    } catch (e) {
+      console.error('Photo download error:', e);
+      showStatus('Could not download that photo. Try right-click → Save Image.', 'error');
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = prev; }
+    }
   }
 
   function displayPackGrid(pack) {
