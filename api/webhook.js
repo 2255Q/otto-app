@@ -1,3 +1,4 @@
+// Updated: Sat Jun  6 11:52:19 UTC 2026
 // Otto — Stripe Webhook Handler (Vercel serverless function, Node 18+ ESM) — FIXED VERSION
 // Listens for Stripe subscription events and updates the user's billing status in Supabase.
 // Events handled:
@@ -33,25 +34,36 @@ import Stripe from 'stripe';
 
 // Map Stripe price IDs to plan tiers (must match checkout.js)
 // Get these from your Stripe Dashboard: https://dashboard.stripe.com/products
+// Canonical tiers match www.leadotto.com pricing: starter/professional/elite.
+// Legacy BASIC/PRO/PREMIUM env names are accepted as fallbacks.
 function getPriceIdToTierMapping() {
-  return {
-    [process.env.STRIPE_PRICE_ID_BASIC || '']: 'basic',
-    [process.env.STRIPE_PRICE_ID_PRO || '']: 'pro',
-    [process.env.STRIPE_PRICE_ID_PREMIUM || '']: 'premium'
-  };
+  const map = {};
+  const starter = process.env.STRIPE_PRICE_ID_STARTER || process.env.STRIPE_PRICE_ID_BASIC;
+  const professional = process.env.STRIPE_PRICE_ID_PROFESSIONAL || process.env.STRIPE_PRICE_ID_PRO;
+  const elite = process.env.STRIPE_PRICE_ID_ELITE || process.env.STRIPE_PRICE_ID_PREMIUM;
+  if (starter) map[starter] = 'starter';
+  if (professional) map[professional] = 'professional';
+  if (elite) map[elite] = 'elite';
+  return map;
 }
+
+// Stripe signature verification needs the exact raw request bytes, so Vercel's
+// automatic JSON body parsing must be disabled for this route.
+export const config = {
+  api: { bodyParser: false }
+};
 
 // Validate configuration at startup
 function validateConfig() {
   const required = [
     'STRIPE_SECRET_KEY',
     'STRIPE_WEBHOOK_SECRET',
-    'STRIPE_PRICE_ID_BASIC',
-    'STRIPE_PRICE_ID_PRO',
-    'STRIPE_PRICE_ID_PREMIUM',
     'SUPABASE_URL',
     'SUPABASE_SECRET_KEY'
   ];
+  if (Object.keys(getPriceIdToTierMapping()).length === 0) {
+    console.error('ERROR: No Stripe price ID env vars set (STRIPE_PRICE_ID_STARTER/PROFESSIONAL/ELITE)');
+  }
 
   const missing = [];
   const invalid = [];
@@ -364,31 +376,25 @@ async function handleSubscriptionCancelled(supa, subscription) {
 // Vercel passes the parsed body by default, but Stripe signature verification
 // requires the exact original bytes. This function properly extracts them.
 async function getRawBody(req) {
-  // Vercel provides req.rawBody for this purpose (requires middleware)
-  if (req.rawBody) {
-    if (typeof req.rawBody === 'string') {
-      return req.rawBody;
+  // With bodyParser disabled (see `export const config` above), the request is a
+  // readable stream and we buffer the exact original bytes.
+  if (typeof req.on === 'function' && req.readable !== false && req.body === undefined) {
+    const chunks = [];
+    for await (const chunk of req) {
+      chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
     }
-    if (Buffer.isBuffer(req.rawBody)) {
-      return req.rawBody.toString('utf-8');
-    }
+    return Buffer.concat(chunks).toString('utf-8');
   }
 
-  // If body is already a string, use it directly
-  if (typeof req.body === 'string') {
-    return req.body;
-  }
-
-  // If body is a Buffer, convert to string
-  if (Buffer.isBuffer(req.body)) {
-    return req.body.toString('utf-8');
-  }
+  // Fallbacks in case a runtime still provides a pre-read body
+  if (typeof req.rawBody === 'string') return req.rawBody;
+  if (Buffer.isBuffer(req.rawBody)) return req.rawBody.toString('utf-8');
+  if (typeof req.body === 'string') return req.body;
+  if (Buffer.isBuffer(req.body)) return req.body.toString('utf-8');
 
   // Last resort: re-stringify (lossy, may fail signature verification)
-  // This should not happen with proper Vercel middleware configuration
   if (typeof req.body === 'object' && req.body !== null) {
-    console.warn('FALLBACK: Re-stringifying parsed body for signature verification. ' +
-      'This may fail if key order differs. Configure Vercel middleware for raw body access.');
+    console.warn('FALLBACK: Re-stringifying parsed body for signature verification.');
     return JSON.stringify(req.body);
   }
 

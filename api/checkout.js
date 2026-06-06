@@ -10,21 +10,17 @@
 import { createClient } from '@supabase/supabase-js';
 import Stripe from 'stripe';
 
-// TODO: Get Stripe Price IDs from your Stripe Dashboard:
-// 1. Go to https://dashboard.stripe.com/products
-// 2. Create or select each product:
-//    - "Otto Basic" ($49/month)
-//    - "Otto Pro" ($99/month)
-//    - "Otto Premium" ($149/month)
-// 3. For each product, click "Add pricing" and create a monthly recurring price.
-// 4. Copy each price ID (format: price_...) and set them as env vars in Vercel:
-//    - STRIPE_PRICE_ID_BASIC=price_xxxxx
-//    - STRIPE_PRICE_ID_PRO=price_xxxxx
-//    - STRIPE_PRICE_ID_PREMIUM=price_xxxxx
+// Plan tiers match www.leadotto.com pricing: Starter $49 / Professional $99 / Elite $149.
+// Stripe Price IDs come from the Stripe Dashboard (https://dashboard.stripe.com/products):
+// create each product with a monthly recurring price, then set env vars in Vercel:
+//    - STRIPE_PRICE_ID_STARTER=price_...
+//    - STRIPE_PRICE_ID_PROFESSIONAL=price_...
+//    - STRIPE_PRICE_ID_ELITE=price_...
+// (Legacy BASIC/PRO/PREMIUM env names are accepted as fallbacks.)
 const PRICE_IDS = {
-  basic: process.env.STRIPE_PRICE_ID_BASIC || 'price_xxxxx', // Replace with actual price ID
-  pro: process.env.STRIPE_PRICE_ID_PRO || 'price_xxxxx',
-  premium: process.env.STRIPE_PRICE_ID_PREMIUM || 'price_xxxxx'
+  starter: process.env.STRIPE_PRICE_ID_STARTER || process.env.STRIPE_PRICE_ID_BASIC || '',
+  professional: process.env.STRIPE_PRICE_ID_PROFESSIONAL || process.env.STRIPE_PRICE_ID_PRO || '',
+  elite: process.env.STRIPE_PRICE_ID_ELITE || process.env.STRIPE_PRICE_ID_PREMIUM || ''
 };
 
 // Verify the caller's Supabase login. Returns {configured, user}.
@@ -143,11 +139,10 @@ export default async function handler(req, res) {
     return;
   }
 
-  // Check Stripe keys
+  // Check Stripe key (only the secret key is needed server-side)
   const secretKey = process.env.STRIPE_SECRET_KEY;
-  const publishableKey = process.env.STRIPE_PUBLISHABLE_KEY;
-  if (!secretKey || !publishableKey) {
-    console.error('Stripe keys not configured');
+  if (!secretKey) {
+    console.error('Stripe secret key not configured');
     res.status(503).json({ ok: false, error: 'stripe_unconfigured' });
     return;
   }
@@ -157,15 +152,17 @@ export default async function handler(req, res) {
     const body = (req.body && typeof req.body === 'object') ? req.body : {};
     const planTier = String(body.plan_tier || '').toLowerCase();
 
-    // Validate plan tier
-    if (!['basic', 'pro', 'premium'].includes(planTier)) {
+    // Validate plan tier (canonical: starter/professional/elite; accept legacy names)
+    const TIER_ALIASES = { basic: 'starter', pro: 'professional', premium: 'elite' };
+    const tier = TIER_ALIASES[planTier] || planTier;
+    if (!['starter', 'professional', 'elite'].includes(tier)) {
       res.status(400).json({ ok: false, error: 'invalid_plan_tier' });
       return;
     }
 
-    const priceId = PRICE_IDS[planTier];
-    if (!priceId || priceId.startsWith('price_xxxxx')) {
-      console.error(`Price ID not configured for tier: ${planTier}`);
+    const priceId = PRICE_IDS[tier];
+    if (!priceId || priceId.includes('xxxxx')) {
+      console.error(`Price ID not configured for tier: ${tier}`);
       res.status(503).json({ ok: false, error: 'price_id_not_configured' });
       return;
     }
@@ -195,15 +192,17 @@ export default async function handler(req, res) {
           quantity: 1
         }
       ],
-      success_url: `${process.env.APP_URL || 'https://app.leadotto.com'}/billing?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.APP_URL || 'https://app.leadotto.com'}/billing?cancelled=true`,
+      // App is a single static page — send users back to / (a /billing path would 404)
+      success_url: `${process.env.APP_URL || 'https://app.leadotto.com'}/?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.APP_URL || 'https://app.leadotto.com'}/?checkout=cancelled`,
       metadata: {
-        plan_tier: planTier,
+        plan_tier: tier,
         supabase_user_id: auth.user.id
       }
     });
 
-    res.status(200).json({ ok: true, url: session.url });
+    // checkout_url is what the frontend reads; url kept for compatibility
+    res.status(200).json({ ok: true, url: session.url, checkout_url: session.url });
   } catch (e) {
     console.error('Checkout error:', e.message);
     if (e.type === 'StripeInvalidRequestError') {

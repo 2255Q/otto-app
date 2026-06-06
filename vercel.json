@@ -1,27 +1,22 @@
 {
   "functions": {
     "api/webhook.js": {
-      "memory": 3008,
+      "memory": 2048,
       "maxDuration": 30
     },
     "api/checkout.js": {
-      "memory": 3008,
+      "memory": 2048,
       "maxDuration": 30
     },
     "api/generate.js": {
-      "memory": 3008,
+      "memory": 2048,
+      "maxDuration": 30
+    },
+    "api/scrape-listing.js": {
+      "memory": 1024,
       "maxDuration": 30
     }
   },
   "buildCommand": "npm install",
-  "env": {
-    "STRIPE_SECRET_KEY": "@stripe-secret-key",
-    "STRIPE_WEBHOOK_SECRET": "@stripe-webhook-secret",
-    "STRIPE_PRICE_ID_BASIC": "@stripe-price-id-basic",
-    "STRIPE_PRICE_ID_PRO": "@stripe-price-id-pro",
-    "STRIPE_PRICE_ID_PREMIUM": "@stripe-price-id-premium",
-    "SUPABASE_URL": "@supabase-url",
-    "SUPABASE_SECRET_KEY": "@supabase-secret-key"
-  },
-  "public": false
+  "outputDirectory": "."
 }
