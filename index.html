@@ -1480,7 +1480,27 @@
         ? appState.scrapedImages
         : (imageUrl ? [imageUrl] : []);
 
-      appState.lastGenerated = { ...textData, images: displayImages };
+      // /api/generate nests content under `result`:
+      // { marketplaceTitle, marketplace, facebook, reel, tiktok, craigslist, hashtags }
+      const content = textData.result || textData;
+      const hashtags = Array.isArray(content.hashtags)
+        ? content.hashtags.join(' ')
+        : (content.hashtags || '');
+      const pack = [
+        content.marketplaceTitle && content.marketplace
+          ? content.marketplaceTitle + '\n\n' + content.marketplace
+          : (content.marketplace || ''),
+        content.craigslist || '',
+        hashtags
+      ].filter(Boolean);
+
+      appState.lastGenerated = {
+        facebook: content.facebook || content.marketplace || '',
+        instagram: [content.reel || content.instagram || '', hashtags].filter(Boolean).join('\n\n'),
+        tiktok: [content.tiktok || '', hashtags].filter(Boolean).join('\n\n'),
+        pack,
+        images: displayImages
+      };
       displayOutputs(appState.lastGenerated);
       showStatus(appState.scrapedImages?.length ? '✅ Listing generated with dealership photos!' : 'Listing generated!', 'success');
     } catch (e) {

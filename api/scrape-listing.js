@@ -407,12 +407,14 @@ export function extractListing(html, url) {
   if (data.year) data.year = String(data.year).slice(0, 4);
   if (data.color) data.color = String(data.color).slice(0, 40);
 
-  // Features: derive a few short selling points from the description
+  // Features: derive a few short selling points from the description,
+  // skipping CTAs/contact lines ("Call (904) ... for more information")
   if (data.description) {
+    const CTA_JUNK = /call|phone|contact|visit|click|hablamos|se habla|www\.|https?:|\(\d{3}\)|\d{3}[-.]\d{3,4}|for more info|schedule|test drive today|stop by|come see/i;
     data.features = data.description
       .split(/[•|]|\. /)
       .map(s => s.trim())
-      .filter(s => s.length > 8 && s.length < 90)
+      .filter(s => s.length > 8 && s.length < 90 && !CTA_JUNK.test(s))
       .slice(0, 5);
   }
 
