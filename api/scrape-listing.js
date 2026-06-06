@@ -351,7 +351,12 @@ function extractImages(html, baseUrl, seed) {
     // 1x1 placeholders), then request a full-size rendition from known CDNs:
     // pictures.dealer.com defaults to a 110px thumbnail without these params.
     if (/\.(jpe?g|png|webp)\?/i.test(u)) u = u.split('?')[0];
-    if (/pictures\.dealer\.com/i.test(u)) u += '?impolicy=resize&w=1024';
+    if (/pictures\.dealer\.com/i.test(u)) {
+      // The inline JSON lists thumbnail variants (thumb_<hash>.jpg, 110px
+      // master). The full-size original is the same filename without the
+      // prefix; the resize policy then serves a proper 1024px rendition.
+      u = u.replace(/\/thumb_([^/]+)$/, '/$1') + '?impolicy=resize&w=1024';
+    }
     found.push(u);
   };
 
