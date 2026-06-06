@@ -10,10 +10,12 @@
 //
 // Security:
 //   - Requires Supabase auth (same pattern as generate.js)
-//   - SSRF guard: only http(s), public hostnames; redirects re-checked by fetch
+//   - SSRF guard: only http(s); hostname AND resolved IP must be public;
+//     redirects followed manually and each hop re-validated
 //   - Fetch timeout via AbortController; response size capped
 
 import { createClient } from '@supabase/supabase-js';
+import dns from 'node:dns/promises';
 
 const FETCH_TIMEOUT_MS = 9000;
 const MAX_HTML_BYTES = 3 * 1024 * 1024; // 3 MB cap
@@ -73,15 +75,39 @@ function isPublicHttpUrl(raw) {
   if (u.protocol !== 'http:' && u.protocol !== 'https:') return false;
   const host = u.hostname.toLowerCase();
   if (host === 'localhost' || host.endsWith('.local') || host.endsWith('.internal')) return false;
-  // Block raw IPs in private/reserved ranges (and all raw IPv6)
+  // Block raw IPv6 literals outright
   if (host.includes(':')) return false;
+  // If it's a raw IPv4 literal, check it directly
   const ipv4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
-  if (ipv4) {
-    const [a, b] = [Number(ipv4[1]), Number(ipv4[2])];
-    if (a === 10 || a === 127 || a === 0 || (a === 192 && b === 168) ||
-        (a === 172 && b >= 16 && b <= 31) || (a === 169 && b === 254)) return false;
-  }
+  if (ipv4 && isPrivateIpv4(host)) return false;
   return true;
+}
+
+function isPrivateIpv4(ip) {
+  const m = ip.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (!m) return false;
+  const [a, b] = [Number(m[1]), Number(m[2])];
+  return a === 10 || a === 127 || a === 0 ||
+    (a === 192 && b === 168) ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 169 && b === 254) ||
+    a >= 224; // multicast / reserved
+}
+
+// Resolve the hostname and confirm no A/AAAA record points at a private range.
+// Defends against DNS-rebinding where a public name resolves to an internal IP.
+async function hostResolvesPublic(hostname) {
+  try {
+    const records = await dns.lookup(hostname, { all: true });
+    if (!records.length) return false;
+    for (const r of records) {
+      if (r.family === 6) return false; // be strict: reject IPv6 targets
+      if (isPrivateIpv4(r.address)) return false;
+    }
+    return true;
+  } catch (e) {
+    return false; // unresolvable → treat as unsafe
+  }
 }
 
 // ---------- JSON-LD ----------
@@ -403,36 +429,55 @@ export default async function handler(req, res) {
     const body = (req.body && typeof req.body === 'object') ? req.body : {};
     const listingUrl = String(body.url || '').trim();
 
-    if (!isPublicHttpUrl(listingUrl)) {
+    if (!isPublicHttpUrl(listingUrl) || !(await hostResolvesPublic(new URL(listingUrl).hostname))) {
       res.status(400).json({ ok: false, error: 'invalid_url', message: 'Please paste a full dealership listing URL (https://...)' });
       return;
     }
 
+    // Manual redirect loop: each hop's URL is re-validated (host + resolved IP)
+    // so a public page can't bounce us to an internal/metadata address.
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
     let fetchRes;
+    let currentUrl = listingUrl;
     try {
-      fetchRes = await fetch(listingUrl, {
-        signal: controller.signal,
-        redirect: 'follow',
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          'Accept-Language': 'en-US,en;q=0.9'
+      for (let hop = 0; hop < 5; hop++) {
+        fetchRes = await fetch(currentUrl, {
+          signal: controller.signal,
+          redirect: 'manual',
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9'
+          }
+        });
+        if (![301, 302, 303, 307, 308].includes(fetchRes.status)) break;
+        const loc = fetchRes.headers.get('location');
+        if (!loc) break;
+        const next = new URL(loc, currentUrl).href;
+        if (!isPublicHttpUrl(next) || !(await hostResolvesPublic(new URL(next).hostname))) {
+          res.status(400).json({ ok: false, error: 'unsafe_redirect', message: 'That link redirected somewhere we can\'t fetch. Please fill in details manually.' });
+          return;
         }
-      });
+        currentUrl = next;
+        if (hop === 4) { // too many redirects
+          res.status(422).json({ ok: false, error: 'too_many_redirects', message: 'That page redirected too many times. Please fill in details manually.' });
+          return;
+        }
+      }
     } finally {
       clearTimeout(timer);
     }
 
-    if (!fetchRes.ok) {
-      const blocked = [403, 429, 503].includes(fetchRes.status);
+    if (!fetchRes || !fetchRes.ok) {
+      const status = fetchRes ? fetchRes.status : 0;
+      const blocked = [403, 429, 503].includes(status);
       res.status(422).json({
         ok: false,
         error: blocked ? 'site_blocked_request' : 'failed_to_fetch_listing',
         message: blocked
           ? 'This dealership site blocked automated access. Please fill in the details manually.'
-          : `Could not load that page (HTTP ${fetchRes.status}). Check the URL and try again.`
+          : `Could not load that page (HTTP ${status}). Check the URL and try again.`
       });
       return;
     }

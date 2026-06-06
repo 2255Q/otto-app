@@ -997,10 +997,14 @@
         </div>
 
         <div class="button-group">
-          <button class="btn btn-primary" id="generateBtn">
-            <span>Generate listing</span>
-          </button>
-          <button class="btn btn-ghost" id="importBtn">Import</button>
+          <div id="generateWrap" style="flex: 1;">
+            <button class="btn btn-primary" id="generateBtn" style="width: 100%;">
+              <span>Generate listing</span>
+            </button>
+          </div>
+          <div id="importWrap">
+            <button class="btn btn-ghost" id="importBtn">Import</button>
+          </div>
         </div>
 
         <div style="margin-top: 20px; padding: 14px; background: var(--bg-soft); border-radius: 12px; font-size: 13px; color: var(--gray);">
@@ -1094,10 +1098,16 @@
     if (session) {
       try {
         const parsed = JSON.parse(session);
+        // Stored shape is { user, session } (see handleSignIn), so the token
+        // lives at parsed.session.access_token — not parsed.access_token.
         authState = {
           user: parsed.user,
-          session: parsed,
+          session: parsed.session,
         };
+        if (!authState.session || !authState.session.access_token) {
+          clearAuth();
+          return;
+        }
         showApp();
       } catch (e) {
         clearAuth();
@@ -1256,25 +1266,23 @@
   function updateFeatureLocks() {
     const tier = subscriptionState.plan_tier;
 
-    const generateBtn = document.getElementById('generateBtn');
-    const generateContainer = generateBtn.parentElement;
+    // Each button lives in its own wrapper (#generateWrap / #importWrap), so we
+    // can rewrite one without destroying the other.
+    const generateWrap = document.getElementById('generateWrap');
     const generateLocked = !FREE_PREVIEW && (!tier || !FEATURE_TIERS.generate.includes(tier));
-
     if (generateLocked) {
-      generateContainer.innerHTML = '<div class="locked-feature" style="position: relative;"><button class="btn btn-primary" disabled style="width: 100%;">Generate listing</button><div class="locked-badge" onclick="showSubscriptionGate()">🔒 Upgrade</div></div>';
+      generateWrap.innerHTML = '<div class="locked-feature" style="position: relative;"><button class="btn btn-primary" disabled style="width: 100%;">Generate listing</button><div class="locked-badge" onclick="showSubscriptionGate()">🔒 Upgrade</div></div>';
     } else {
-      generateContainer.innerHTML = '<button class="btn btn-primary" id="generateBtn">Generate listing</button>';
+      generateWrap.innerHTML = '<button class="btn btn-primary" id="generateBtn" style="width: 100%;"><span>Generate listing</span></button>';
       document.getElementById('generateBtn').addEventListener('click', handleGenerate);
     }
 
-    const importBtn = document.getElementById('importBtn');
-    const importContainer = importBtn.parentElement;
+    const importWrap = document.getElementById('importWrap');
     const importLocked = !FREE_PREVIEW && (!tier || !FEATURE_TIERS.import.includes(tier));
-
     if (importLocked) {
-      importContainer.innerHTML = '<div class="locked-feature" style="position: relative;"><button class="btn btn-ghost" disabled>Import</button><div class="locked-badge" onclick="showSubscriptionGate()">🔒 Upgrade</div></div>';
+      importWrap.innerHTML = '<div class="locked-feature" style="position: relative;"><button class="btn btn-ghost" disabled>Import</button><div class="locked-badge" onclick="showSubscriptionGate()">🔒 Upgrade</div></div>';
     } else {
-      importContainer.innerHTML = '<button class="btn btn-ghost" id="importBtn">Import</button>';
+      importWrap.innerHTML = '<button class="btn btn-ghost" id="importBtn">Import</button>';
       document.getElementById('importBtn').addEventListener('click', handleImport);
     }
   }
@@ -1489,16 +1497,23 @@
     const outputContent = document.getElementById('outputContent');
     const emptyState = document.getElementById('emptyState');
 
-    // Display images if available
+    // Escape a value for safe use inside an HTML attribute (defense-in-depth:
+    // image URLs come from third-party dealership pages).
+    const escAttr = (s) => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+      .replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/'/g, '&#39;');
+
+    // Display images if available — only http(s) URLs, never javascript:/data:
     let imagesHtml = '';
     if (data.images && data.images.length > 0) {
-      const imageUrls = data.images.slice(0, 6); // Show up to 6 images
-      imagesHtml = `<div style="margin-bottom: 24px;">
+      const imageUrls = data.images
+        .filter(img => /^https?:\/\//i.test(String(img)))
+        .slice(0, 6); // Show up to 6 images
+      imagesHtml = imageUrls.length === 0 ? '' : `<div style="margin-bottom: 24px;">
         <p style="font-size: 12px; color: var(--gray); margin-bottom: 12px;">Car Images (from dealership)</p>
         <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
           ${imageUrls.map((img, idx) => `
             <div style="aspect-ratio: 4/3; overflow: hidden; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-              <img src="${img}" alt="Car image ${idx + 1}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.style.display='none'"/>
+              <img src="${escAttr(img)}" alt="Car image ${idx + 1}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.style.display='none'"/>
             </div>
           `).join('')}
         </div>

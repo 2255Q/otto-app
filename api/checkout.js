@@ -50,8 +50,9 @@ async function authedUser(req) {
 // Returns {stripe_customer_id, success: true} or {success: false, error: "..."}
 async function getOrCreateStripeCustomer(stripe, supa, user) {
   try {
-    // Fetch user's profile to check for existing stripe_customer_id
-    const { data: profile, error: fetchErr } = await supa
+    // Fetch user's profile to check for existing stripe_customer_id.
+    // `profile` is reassigned in the missing-profile branch below, so it must be `let`.
+    let { data: profile, error: fetchErr } = await supa
       .from('profiles')
       .select('id, stripe_customer_id, email')
       .eq('id', user.id)

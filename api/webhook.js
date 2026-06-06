@@ -204,20 +204,15 @@ export default async function handler(req, res) {
       stack: e.stack
     });
 
-    // CRITICAL FIX #4: Distinguish between errors
-    // - Client errors (bad signature): return 200 to stop retries
-    // - Server errors (DB down): return 5xx to allow retries
-    if (
-      e.message.includes('signature') ||
-      e.code === 'SIGNATURE_VERIFICATION_FAILED' ||
-      e.message.includes('not found')
-    ) {
-      // Client error - don't retry
+    // Distinguish error classes:
+    // - Signature failures are non-retryable client errors → 200 (stop retries)
+    // - Everything else (DB write failures, transient outages) → 500 so Stripe
+    //   retries and we don't permanently lose a paid customer's activation.
+    const msg = String((e && e.message) || '');
+    if (msg.includes('signature') || (e && e.code === 'SIGNATURE_VERIFICATION_FAILED')) {
       return res.status(200).json({ ok: true, received: true });
-    } else {
-      // Server error - allow retry
-      return res.status(500).json({ ok: false, error: 'server_error' });
     }
+    return res.status(500).json({ ok: false, error: 'server_error' });
   }
 }
 
@@ -237,12 +232,10 @@ async function handleSubscriptionUpsert(supa, subscription) {
       .single();
 
     if (fetchErr) {
-      console.warn('Could not find user for customer', {
-        customerId,
-        error: fetchErr.message,
-        code: fetchErr.code
-      });
-      return;
+      // Could be a transient DB error OR a race where checkout hasn't yet
+      // written stripe_customer_id. Throw so the outer handler returns 500 and
+      // Stripe retries (it backs off over ~3 days, then gives up).
+      throw new Error(`profile_lookup_failed (${fetchErr.code}): ${fetchErr.message}`);
     }
 
     // Get the price ID from the first line item
@@ -290,12 +283,9 @@ async function handleSubscriptionUpsert(supa, subscription) {
       .eq('id', profile.id);
 
     if (updateErr) {
-      console.error('Error updating profile', {
-        userId: profile.id,
-        error: updateErr.message,
-        code: updateErr.code
-      });
-      return;
+      // The write that actually activates a paying customer failed — throw so
+      // Stripe retries rather than silently leaving them unactivated.
+      throw new Error(`profile_update_failed (${updateErr.code}): ${updateErr.message}`);
     }
 
     console.info('Subscription upserted successfully', {
@@ -312,6 +302,7 @@ async function handleSubscriptionUpsert(supa, subscription) {
       stack: e.stack,
       subscriptionId: subscription.id
     });
+    throw e; // let the main handler return 500 so Stripe retries
   }
 }
 
@@ -372,21 +363,25 @@ async function handleSubscriptionCancelled(supa, subscription) {
   }
 }
 
-// CRITICAL FIX #1: Extract raw body from request
-// Vercel passes the parsed body by default, but Stripe signature verification
-// requires the exact original bytes. This function properly extracts them.
+// Extract the exact raw request bytes for Stripe signature verification.
+// Stripe needs the original payload — a re-serialized parsed object won't match.
 async function getRawBody(req) {
-  // With bodyParser disabled (see `export const config` above), the request is a
-  // readable stream and we buffer the exact original bytes.
-  if (typeof req.on === 'function' && req.readable !== false && req.body === undefined) {
-    const chunks = [];
-    for await (const chunk of req) {
-      chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
+  // Prefer the stream. We read it FIRST (before touching req.body, which on some
+  // runtimes is a lazy getter that would consume the stream). If the stream was
+  // already drained by the platform's parser, this yields empty and we fall back.
+  if (typeof req[Symbol.asyncIterator] === 'function' && req.readable !== false) {
+    try {
+      const chunks = [];
+      for await (const chunk of req) {
+        chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
+      }
+      if (chunks.length) return Buffer.concat(chunks).toString('utf-8');
+    } catch (e) {
+      console.warn('Raw stream read failed, falling back:', e.message);
     }
-    return Buffer.concat(chunks).toString('utf-8');
   }
 
-  // Fallbacks in case a runtime still provides a pre-read body
+  // Fallbacks for runtimes that pre-read the body
   if (typeof req.rawBody === 'string') return req.rawBody;
   if (Buffer.isBuffer(req.rawBody)) return req.rawBody.toString('utf-8');
   if (typeof req.body === 'string') return req.body;
