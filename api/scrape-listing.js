@@ -94,15 +94,26 @@ function isPrivateIpv4(ip) {
     a >= 224; // multicast / reserved
 }
 
+function isPrivateIpv6(ip) {
+  const v = ip.toLowerCase();
+  if (v === '::1' || v === '::') return true;            // loopback / unspecified
+  if (v.startsWith('fe80')) return true;                  // link-local
+  if (v.startsWith('fc') || v.startsWith('fd')) return true; // unique-local fc00::/7
+  const mapped = v.match(/^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/); // v4-mapped
+  if (mapped) return isPrivateIpv4(mapped[1]);
+  return false;
+}
+
 // Resolve the hostname and confirm no A/AAAA record points at a private range.
 // Defends against DNS-rebinding where a public name resolves to an internal IP.
+// Public IPv6 (AAAA) is fine — most CDN-backed dealership sites have it.
 async function hostResolvesPublic(hostname) {
   try {
     const records = await dns.lookup(hostname, { all: true });
     if (!records.length) return false;
     for (const r of records) {
-      if (r.family === 6) return false; // be strict: reject IPv6 targets
-      if (isPrivateIpv4(r.address)) return false;
+      if (r.family === 4 && isPrivateIpv4(r.address)) return false;
+      if (r.family === 6 && isPrivateIpv6(r.address)) return false;
     }
     return true;
   } catch (e) {
