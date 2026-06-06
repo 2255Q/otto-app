@@ -12,7 +12,7 @@
 import { lookup } from 'node:dns/promises';
 
 const MODEL = 'claude-haiku-4-5-20251001';
-const FETCH_TIMEOUT_MS = 9000;
+const FETCH_TIMEOUT_MS = 6000; // leaves headroom under Vercel's 10s function cap for the Claude call
 const RAW_CAP = 400000;     // raw HTML chars to process (enough to reach the spec section + gallery JSON)
 const MAX_TEXT_CHARS = 16000;
 const MAX_TOKENS = 500;
