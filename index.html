@@ -63,6 +63,15 @@
   <div class="panel">
     <h2>Vehicle details</h2>
     <p class="hint">Fill this in once — Otto writes every post for you.</p>
+    <div class="field">
+      <label>Paste a dealer listing link (optional)</label>
+      <div style="display:flex;gap:8px">
+        <input id="importUrl" type="url" placeholder="https://dealer.com/inventory/..." style="flex:1" />
+        <button type="button" onclick="importUrl()" style="padding:10px 16px;border:none;border-radius:10px;background:var(--ink);color:#fff;font-weight:600;font-size:14px;cursor:pointer;white-space:nowrap">Import</button>
+      </div>
+      <div id="importStatus" style="font-size:12px;color:var(--gray);margin-top:6px;min-height:15px"></div>
+    </div>
+    <div style="height:1px;background:var(--line);margin:2px 0 16px"></div>
     <div class="form-row">
       <div class="field"><label>Year</label><input id="year" placeholder="2021" /></div>
       <div class="field"><label>Make</label><input id="make" placeholder="Jeep" /></div>
@@ -222,6 +231,27 @@ function renderPack(pack){
   });
   document.getElementById('regenBtn').style.display='inline-block';
   window.scrollTo({top:0,behavior:'smooth'});
+}
+
+async function importUrl(){
+  const url=(document.getElementById('importUrl').value||'').trim();
+  const st=document.getElementById('importStatus');
+  const btn=document.getElementById('importUrl').nextElementSibling;
+  if(!url){ st.style.color='var(--gray)'; st.textContent='Paste a dealer listing link first.'; return; }
+  st.style.color='var(--gray)'; st.textContent='🔎 Reading the listing…'; if(btn) btn.disabled=true;
+  try{
+    const res=await fetch('/api/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url})});
+    const data=await res.json();
+    if(data && data.ok && data.vehicle){
+      const v=data.vehicle, set=(id,val)=>{const el=document.getElementById(id); if(el && val) el.value=val;};
+      set('year',v.year);set('make',v.make);set('model',v.model);set('trim',v.trim);
+      set('miles',v.miles);set('price',v.price);set('color',v.color);set('features',v.features);
+      st.style.color='var(--ok)'; st.textContent='✓ Imported — check the details, then Generate.';
+    } else {
+      st.style.color='#d4537e'; st.textContent='Couldn’t read that page — just fill the details in below.';
+    }
+  }catch(e){ st.style.color='#d4537e'; st.textContent='Import failed — fill the details in below.'; }
+  if(btn) btn.disabled=false;
 }
 
 async function generate(){
