@@ -10,6 +10,22 @@
 //  - Only parsed fields + public image URLs are returned, never the raw fetched body.
 
 import { lookup } from 'node:dns/promises';
+import { createClient } from '@supabase/supabase-js';
+
+// Verify the caller's Supabase login. Open until SUPABASE env vars are set.
+async function authedUser(req) {
+  const url = process.env.SUPABASE_URL, secret = process.env.SUPABASE_SECRET_KEY;
+  if (!url || !secret) return { configured: false, user: null };
+  const h = req.headers['authorization'] || '';
+  const token = h.startsWith('Bearer ') ? h.slice(7) : '';
+  if (!token) return { configured: true, user: null };
+  try {
+    const supa = createClient(url, secret, { auth: { persistSession: false, autoRefreshToken: false } });
+    const { data, error } = await supa.auth.getUser(token);
+    if (error || !data || !data.user) return { configured: true, user: null };
+    return { configured: true, user: data.user };
+  } catch (e) { return { configured: true, user: null }; }
+}
 
 const MODEL = 'claude-haiku-4-5-20251001';
 const FETCH_TIMEOUT_MS = 6000; // leaves headroom under Vercel's 10s function cap for the Claude call
@@ -155,6 +171,10 @@ export default async function handler(req, res) {
 
   const len = Number(req.headers['content-length'] || 0);
   if (len > 4096) { res.status(413).json({ ok: false, error: 'too_large' }); return; }
+
+  // Require a logged-in customer (once Supabase is configured).
+  const auth = await authedUser(req);
+  if (auth.configured && !auth.user) { res.status(401).json({ ok: false, error: 'unauthorized' }); return; }
 
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) { res.status(503).json({ ok: false, error: 'ai_unconfigured' }); return; }

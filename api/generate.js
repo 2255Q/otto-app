@@ -5,9 +5,27 @@
 //  - On any error or missing key we return {ok:true, fallback:true} so the frontend
 //    gracefully uses its built-in template engine instead of breaking.
 
+import { createClient } from '@supabase/supabase-js';
+
 const FIELD_MAX = 200;
 const MODEL = 'claude-haiku-4-5-20251001'; // cheap, fast, excellent copy — ~$0.007 per generation
 const MAX_TOKENS = 900;                    // hard cap on output cost per call
+
+// Verify the caller's Supabase login. Returns {configured, user}.
+// If SUPABASE env vars aren't set yet, auth is treated as "not configured" (open) for rollout.
+async function authedUser(req) {
+  const url = process.env.SUPABASE_URL, secret = process.env.SUPABASE_SECRET_KEY;
+  if (!url || !secret) return { configured: false, user: null };
+  const h = req.headers['authorization'] || '';
+  const token = h.startsWith('Bearer ') ? h.slice(7) : '';
+  if (!token) return { configured: true, user: null };
+  try {
+    const supa = createClient(url, secret, { auth: { persistSession: false, autoRefreshToken: false } });
+    const { data, error } = await supa.auth.getUser(token);
+    if (error || !data || !data.user) return { configured: true, user: null };
+    return { configured: true, user: data.user };
+  } catch (e) { return { configured: true, user: null }; }
+}
 
 function extractJSON(t) {
   if (!t) return null;
@@ -33,6 +51,10 @@ export default async function handler(req, res) {
   // Reject oversized request bodies (bounds parse + token cost from abuse).
   const len = Number(req.headers['content-length'] || 0);
   if (len > 4096) { res.status(413).json({ ok: false, error: 'too_large' }); return; }
+
+  // Require a logged-in customer (once Supabase is configured).
+  const auth = await authedUser(req);
+  if (auth.configured && !auth.user) { res.status(401).json({ ok: false, error: 'unauthorized' }); return; }
 
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) {
