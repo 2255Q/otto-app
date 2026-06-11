@@ -2245,14 +2245,14 @@
         const share = document.createElement('button');
         share.className = 'btn btn-primary';
         share.style.cssText = 'display:block;width:100%;text-align:center;';
-        share.textContent = '📲 Save video to phone';
+        share.textContent = '📲 Post to TikTok / Instagram';
         share.addEventListener('click', async () => {
           share.disabled = true; const pv = share.textContent; share.textContent = 'Opening…';
           try {
             await navigator.share({ files: [new File([blob], fname, { type: blob.type || 'video/mp4' })], title: title || 'Otto video' });
-            showStatus('Pick "Save Video" to drop it in your camera roll, ready for TikTok/Reels.', 'success');
+            showStatus('Pick TikTok or Instagram to post — or "Save Video" for your camera roll.', 'success');
           } catch (err) {
-            if (!err || err.name !== 'AbortError') showStatus('Couldn\'t open the share sheet — use Download instead.', 'error');
+            if (!err || err.name !== 'AbortError') showStatus('Couldn\'t open the share menu — use Download instead.', 'error');
           }
           share.disabled = false; share.textContent = pv;
         });
@@ -2265,7 +2265,9 @@
       dl.textContent = '⬇ Download video';
       const tip = document.createElement('div');
       tip.style.cssText = 'font-size:12px;color:var(--gray);margin-top:8px;text-align:center;line-height:1.5;';
-      tip.innerHTML = '🎵 Add a trending sound inside TikTok or Instagram when you post — it\'s free, keeps you copyright-safe, and gets you more views.';
+      tip.innerHTML = canShareVideo
+        ? 'Tap above → choose <strong>TikTok</strong> or <strong>Instagram</strong> → add a trending sound → post. 🎵 Trending sounds are free and get you more views.'
+        : '🎵 Add a trending sound inside TikTok or Instagram when you post — it\'s free, keeps you copyright-safe, and gets you more views.';
       reelArea.appendChild(dl); reelArea.appendChild(tip);
       // Revoke the source-photo object URLs (keep the video URL alive for playback/download)
       created.slice(0, -1).forEach(u => { try { URL.revokeObjectURL(u); } catch (e) {} });
