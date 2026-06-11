@@ -2349,13 +2349,15 @@
     document.getElementById('authPassword').value = '';
   });
 
-  // Show the "get the extension" banner only when the extension isn't installed
+  // Chrome extensions only work on desktop — never prompt phone/tablet users.
+  const IS_MOBILE = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '');
+  // Show the "get the extension" banner only on desktop when it isn't installed
   // (the bridge content script sets data-otto-ext shortly after load).
   setTimeout(() => {
     const b = document.getElementById('extBanner');
     const dismissed = localStorage.getItem('otto_ext_dismissed') === '1';
     const inStudio = !document.querySelector('.studio') || document.querySelector('.studio').style.display !== 'none';
-    if (b && !dismissed && !document.documentElement.hasAttribute('data-otto-ext')) {
+    if (b && !IS_MOBILE && !dismissed && !document.documentElement.hasAttribute('data-otto-ext')) {
       b.dataset.active = '1'; // remember it should show in studio
       if (inStudio) b.style.display = 'flex';
     }
