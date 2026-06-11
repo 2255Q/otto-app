@@ -679,6 +679,42 @@
       background: var(--success);
     }
 
+    /* PLATFORM CARDS */
+    .platform-card {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px;
+      margin: 14px 0;
+      background: #fff;
+    }
+    .platform-card .pc-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 2px;
+    }
+    .platform-card .pc-name { font-size: 14px; font-weight: 700; }
+    .platform-card .pc-link {
+      font-size: 12px; font-weight: 600; color: var(--accent);
+      text-decoration: none; white-space: nowrap;
+    }
+    .platform-card .pc-hint { font-size: 12px; color: var(--gray); margin: 0 0 10px; }
+    .platform-card .pc-sub {
+      font-size: 11px; font-weight: 700; letter-spacing: .05em;
+      text-transform: uppercase; color: var(--gray); margin: 10px 0 4px;
+    }
+    .copy-chip {
+      display: inline-flex; align-items: center; gap: 5px;
+      border: 1px solid var(--line); border-radius: 999px;
+      background: var(--bg-soft); padding: 5px 11px;
+      font-size: 12px; font-weight: 600; cursor: pointer;
+      transition: background .15s, border-color .15s;
+    }
+    .copy-chip:hover { border-color: var(--accent); }
+    .copy-chip.copied { background: #e7f8ed; border-color: var(--success); }
+    .copy-chip .chip-label { color: var(--gray); font-weight: 500; }
+
     /* PACK DISPLAY */
     .pack-grid {
       display: grid;
@@ -942,6 +978,10 @@
   <div class="app-content wrap">
     <div class="status-message" id="statusMessage"></div>
 
+    <div id="extBanner" style="display: none; margin: 0 0 18px; padding: 12px 16px; border: 1px solid var(--line); border-radius: 14px; background: #f0f7ff; font-size: 13px; line-height: 1.5;">
+      ⚡ <strong>Get the Otto button for Chrome</strong> — grab any car straight from your dealership's website and let Otto fill the Facebook Marketplace form for you.
+      <a href="https://chromewebstore.google.com/detail/ejillngakcjjjhomnkbgbimfllkojpbl" target="_blank" rel="noopener" style="color: var(--accent); font-weight: 600;">Add to Chrome ↗</a>
+    </div>
     <div class="studio">
       <!-- INPUT PANEL -->
       <div class="studio-panel">
@@ -1028,19 +1068,72 @@
           </div>
 
           <div id="outputContent" style="display: none;">
-            <div class="output-box" id="facebookOutput">
-              <button class="copy-btn" data-target="facebookOutput">Copy</button>
-              <span id="facebookOutputText"></span>
+
+            <div class="platform-card" id="marketplaceCard">
+              <div class="pc-head">
+                <div class="pc-name">📘 Facebook Marketplace</div>
+                <a class="pc-link" href="https://www.facebook.com/marketplace/create/vehicle" target="_blank" rel="noopener">Open Marketplace form ↗</a>
+              </div>
+              <p class="pc-hint">Tap a chip to copy it into the matching Facebook field, then copy the title and description below.</p>
+              <div id="mpChips" style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px;"></div>
+              <div class="pc-sub">Title</div>
+              <div class="output-box" id="marketplaceTitleOutput">
+                <button class="copy-btn" data-target="marketplaceTitleOutput">Copy</button>
+                <span id="marketplaceTitleOutputText"></span>
+              </div>
+              <div class="pc-sub">Description</div>
+              <div class="output-box" id="marketplaceOutput">
+                <button class="copy-btn" data-target="marketplaceOutput">Copy</button>
+                <span id="marketplaceOutputText"></span>
+              </div>
             </div>
 
-            <div class="output-box" id="instagramOutput">
-              <button class="copy-btn" data-target="instagramOutput">Copy</button>
-              <span id="instagramOutputText"></span>
+            <div class="platform-card">
+              <div class="pc-head">
+                <div class="pc-name">📣 Facebook — feed &amp; groups</div>
+                <a class="pc-link" href="https://www.facebook.com" target="_blank" rel="noopener">Open Facebook ↗</a>
+              </div>
+              <p class="pc-hint">Paste as a regular post or in local car-sale groups, drag your photos in, post. One paste, one drag.</p>
+              <div class="output-box" id="facebookOutput">
+                <button class="copy-btn" data-target="facebookOutput">Copy</button>
+                <span id="facebookOutputText"></span>
+              </div>
             </div>
 
-            <div class="output-box" id="tiktokOutput">
-              <button class="copy-btn" data-target="tiktokOutput">Copy</button>
-              <span id="tiktokOutputText"></span>
+            <div class="platform-card">
+              <div class="pc-head">
+                <div class="pc-name">📸 Instagram</div>
+                <a class="pc-link" href="https://www.instagram.com" target="_blank" rel="noopener">Open Instagram ↗</a>
+              </div>
+              <p class="pc-hint">Paste as the caption when you upload the photos or a reel — hashtags included.</p>
+              <div class="output-box" id="instagramOutput">
+                <button class="copy-btn" data-target="instagramOutput">Copy</button>
+                <span id="instagramOutputText"></span>
+              </div>
+            </div>
+
+            <div class="platform-card">
+              <div class="pc-head">
+                <div class="pc-name">🎵 TikTok</div>
+                <a class="pc-link" href="https://www.tiktok.com/upload" target="_blank" rel="noopener">Open TikTok ↗</a>
+              </div>
+              <p class="pc-hint">Paste as the caption on your walkaround video.</p>
+              <div class="output-box" id="tiktokOutput">
+                <button class="copy-btn" data-target="tiktokOutput">Copy</button>
+                <span id="tiktokOutputText"></span>
+              </div>
+            </div>
+
+            <div class="platform-card" id="craigslistCard" style="display: none;">
+              <div class="pc-head">
+                <div class="pc-name">📋 Craigslist</div>
+                <a class="pc-link" href="https://post.craigslist.org" target="_blank" rel="noopener">Open Craigslist ↗</a>
+              </div>
+              <p class="pc-hint">Paste as the posting body under "cars &amp; trucks — by dealer".</p>
+              <div class="output-box" id="craigslistOutput">
+                <button class="copy-btn" data-target="craigslistOutput">Copy</button>
+                <span id="craigslistOutputText"></span>
+              </div>
             </div>
           </div>
 
@@ -1207,6 +1300,12 @@
       }
 
       const data = await res.json();
+      // Guard: a user with no usable token (e.g. unconfirmed email) must NOT
+      // see the app — every API call would 401 and "kick them out".
+      if (!data.session || !data.session.access_token) {
+        showAuthError('Almost there! Check your email for the confirmation link, click it, then sign in again.');
+        return;
+      }
       authState.user = data.user;
       authState.session = data.session;
 
@@ -1243,6 +1342,12 @@
       }
 
       const data = await res.json();
+      // Supabase returns no session when email confirmation is required.
+      // Showing the app anyway would log them straight back out on first use.
+      if (!data.session || !data.session.access_token) {
+        showSignupError('Account created! Check your email for a confirmation link, click it, then sign in.');
+        return;
+      }
       authState.user = data.user;
       authState.session = data.session;
 
@@ -1548,18 +1653,17 @@
       const hashtags = Array.isArray(content.hashtags)
         ? content.hashtags.join(' ')
         : (content.hashtags || '');
-      const pack = [
-        content.marketplaceTitle && content.marketplace
-          ? content.marketplaceTitle + '\n\n' + content.marketplace
-          : (content.marketplace || ''),
-        content.craigslist || '',
-        hashtags
-      ].filter(Boolean);
+      // Marketplace + Craigslist now have their own labeled cards,
+      // so the pack keeps only the hashtag block as a reusable extra.
+      const pack = [hashtags].filter(Boolean);
 
       appState.lastGenerated = {
+        marketplaceTitle: content.marketplaceTitle || '',
+        marketplace: content.marketplace || content.facebook || '',
         facebook: content.facebook || content.marketplace || '',
         instagram: [content.reel || content.instagram || '', hashtags].filter(Boolean).join('\n\n'),
         tiktok: [content.tiktok || '', hashtags].filter(Boolean).join('\n\n'),
+        craigslist: content.craigslist || '',
         pack,
         images: displayImages
       };
@@ -1590,10 +1694,18 @@
       const imageUrls = data.images
         .filter(img => /^https?:\/\//i.test(String(img)))
         .slice(0, 6); // Show up to 6 images
+      const vids = appState.scrapedVideos || [];
+      const videosHtml = vids.length === 0 ? '' : `<div style="margin-top: 10px; font-size: 12px; color: var(--gray);">
+        🎬 Dealer video${vids.length > 1 ? 's' : ''} found — use for Marketplace (max 1 min), Reels &amp; TikTok:
+        ${vids.map((u, i) => `<a href="${escAttr(u)}" target="_blank" rel="noopener" style="color: var(--accent); font-weight: 600;">video ${i + 1} ↗</a>`).join(' · ')}
+      </div>`;
       imagesHtml = imageUrls.length === 0 ? '' : `<div style="margin-bottom: 24px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
           <p style="font-size: 12px; color: var(--gray); margin: 0;">Car photos (from dealership) — save them, then attach to your post</p>
-          <button id="dlAllBtn" class="btn btn-ghost" style="font-size: 12px; padding: 6px 12px;">⬇ Download all</button>
+          <span style="display:flex; gap:6px;">
+            <button id="shareAllBtn" class="btn btn-ghost" style="font-size: 12px; padding: 6px 12px; display: none;">📲 Save to phone</button>
+            <button id="dlAllBtn" class="btn btn-ghost" style="font-size: 12px; padding: 6px 12px;">⬇ Download all (ZIP)</button>
+          </span>
         </div>
         <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
           ${imageUrls.map((img, idx) => `
@@ -1606,12 +1718,81 @@
             </div>
           `).join('')}
         </div>
+        ${videosHtml}
       </div>`;
     }
 
     document.getElementById('facebookOutputText').textContent = data.facebook || 'No Facebook post generated';
     document.getElementById('instagramOutputText').textContent = data.instagram || 'No Instagram post generated';
     document.getElementById('tiktokOutputText').textContent = data.tiktok || 'No TikTok post generated';
+
+    // Marketplace card: title, description, and copy-chips for FB's form fields
+    const vYear = document.getElementById('vehicleYear').value.trim();
+    const vMake = document.getElementById('vehicleMake').value.trim();
+    const vModel = document.getElementById('vehicleModel').value.trim();
+    const vMileage = document.getElementById('vehicleMileage').value.trim();
+    const vPrice = document.getElementById('vehiclePrice').value.trim();
+    document.getElementById('marketplaceTitleOutputText').textContent =
+      data.marketplaceTitle || [vYear, vMake, vModel].filter(Boolean).join(' ');
+    document.getElementById('marketplaceOutputText').textContent =
+      data.marketplace || data.facebook || '';
+
+    const fbMileage = vMileage && Number(vMileage) < 300 ? '300' : vMileage; // FB rejects <300 mi on new cars
+    const chips = [
+      ['Year', vYear],
+      ['Make', vMake],
+      ['Model', vModel],
+      ['Mileage', fbMileage],
+      ['Price', vPrice],
+    ].filter(c => c[1]);
+    const chipWrap = document.getElementById('mpChips');
+    chipWrap.innerHTML = '';
+    chips.forEach(([label, val]) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'copy-chip';
+      b.innerHTML = '<span class="chip-label">' + label + ':</span> ' + val.replace(/</g, '&lt;');
+      b.addEventListener('click', () => {
+        copyToClipboard(val, label + ' copied!');
+        b.classList.add('copied');
+        setTimeout(() => b.classList.remove('copied'), 1500);
+      });
+      chipWrap.appendChild(b);
+    });
+    if (vMileage && Number(vMileage) < 300) {
+      const note = document.createElement('span');
+      note.style.cssText = 'font-size:11px;color:var(--gray);align-self:center;';
+      note.textContent = 'Mileage shows 300 — Facebook’s minimum for new cars.';
+      chipWrap.appendChild(note);
+    }
+
+    // With the Otto extension installed, clicking "Open Marketplace form"
+    // also queues an auto-fill payload (the extension fills the form there).
+    const mpLink = document.querySelector('#marketplaceCard .pc-link');
+    if (mpLink) {
+      const hasExt = document.documentElement.hasAttribute('data-otto-ext');
+      mpLink.textContent = hasExt ? 'Open Marketplace form — Otto will fill it ↗' : 'Open Marketplace form ↗';
+      mpLink.onclick = () => {
+        window.postMessage({
+          type: 'OTTO_MP_FILL',
+          payload: {
+            year: vYear, make: vMake, model: vModel,
+            mileage: fbMileage, price: vPrice,
+            description: data.marketplace || data.facebook || '',
+            images: (data.images || []).slice(0, 20),
+          },
+        }, window.location.origin);
+      };
+    }
+
+    // Craigslist card only appears when there is Craigslist copy
+    const clCard = document.getElementById('craigslistCard');
+    if (data.craigslist) {
+      document.getElementById('craigslistOutputText').textContent = data.craigslist;
+      clCard.style.display = '';
+    } else {
+      clCard.style.display = 'none';
+    }
 
     // Insert images before text output
     const outputSection = document.querySelector('.output-section');
@@ -1634,16 +1815,86 @@
         });
         const dlAll = imageContainer.querySelector('#dlAllBtn');
         if (dlAll) dlAll.addEventListener('click', async () => {
-          dlAll.disabled = true; dlAll.textContent = 'Downloading…';
-          const btns = [...imageContainer.querySelectorAll('[data-dl]')]
-            .filter(b => b.closest('[data-img-cell]').style.display !== 'none');
-          for (const b of btns) {
-            await downloadCarImage(b.getAttribute('data-dl'), b.getAttribute('data-dl-idx'), null);
-            await new Promise(r => setTimeout(r, 400)); // let the browser register each download
+          // One ZIP instead of N separate downloads: unzip → select all → one drag onto Facebook.
+          dlAll.disabled = true; dlAll.textContent = 'Zipping…';
+          try {
+            if (!window.JSZip) {
+              await new Promise((resolve, reject) => {
+                const s = document.createElement('script');
+                s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+                s.onload = resolve;
+                s.onerror = () => reject(new Error('zip library failed to load'));
+                document.head.appendChild(s);
+              });
+            }
+            const zip = new JSZip();
+            const btns = [...imageContainer.querySelectorAll('[data-dl]')]
+              .filter(b => b.closest('[data-img-cell]').style.display !== 'none');
+            let added = 0;
+            for (const b of btns) {
+              const res = await authedFetch('/api/download-image?src=' + encodeURIComponent(b.getAttribute('data-dl')));
+              if (!res.ok) continue;
+              zip.file('car-photo-' + b.getAttribute('data-dl-idx') + '.jpg', await res.blob());
+              added++;
+            }
+            if (!added) throw new Error('no photos could be fetched');
+            const blob = await zip.generateAsync({ type: 'blob' });
+            const veh = [
+              document.getElementById('vehicleYear').value,
+              document.getElementById('vehicleMake').value,
+              document.getElementById('vehicleModel').value,
+            ].filter(Boolean).join('-').toLowerCase().replace(/[^a-z0-9-]+/g, '-') || 'car';
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = veh + '-photos.zip';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+            showStatus('ZIP saved! Don’t upload the .zip itself — double-click it to open, select all the photos inside, and drag THOSE onto Facebook.', 'success');
+          } catch (e) {
+            console.error('Zip download error:', e);
+            showStatus('Could not build the ZIP — use the ⬇ Save buttons instead.', 'error');
           }
-          dlAll.disabled = false; dlAll.textContent = '⬇ Download all';
-          showStatus('Photos downloaded! Attach them when you post.', 'success');
+          dlAll.disabled = false; dlAll.textContent = '⬇ Download all (ZIP)';
         });
+
+        // Mobile: share photos straight to the camera roll (Web Share API).
+        // From there the Facebook app can attach them like any phone photo.
+        const shareAll = imageContainer.querySelector('#shareAllBtn');
+        if (shareAll && navigator.canShare) {
+          try {
+            if (navigator.canShare({ files: [new File([''], 'probe.jpg', { type: 'image/jpeg' })] })) {
+              shareAll.style.display = '';
+            }
+          } catch (e) { /* file sharing unsupported — keep hidden */ }
+          shareAll.addEventListener('click', async () => {
+            shareAll.disabled = true;
+            const prev = shareAll.textContent;
+            shareAll.textContent = 'Preparing…';
+            try {
+              const btns = [...imageContainer.querySelectorAll('[data-dl]')]
+                .filter(b => b.closest('[data-img-cell]').style.display !== 'none');
+              const files = [];
+              for (const b of btns) {
+                const res = await authedFetch('/api/download-image?src=' + encodeURIComponent(b.getAttribute('data-dl')));
+                if (!res.ok) continue;
+                const blob = await res.blob();
+                files.push(new File([blob], 'car-photo-' + b.getAttribute('data-dl-idx') + '.jpg', { type: blob.type || 'image/jpeg' }));
+              }
+              if (!files.length) throw new Error('no photos could be fetched');
+              await navigator.share({ files });
+              showStatus('Pick "Save Image" in the share menu — the photos land in your camera roll, ready for the Facebook app.', 'success');
+            } catch (e) {
+              if (!e || e.name !== 'AbortError') {
+                console.error('Share error:', e);
+                showStatus('Sharing failed — use the ⬇ Save buttons instead.', 'error');
+              }
+            }
+            shareAll.disabled = false;
+            shareAll.textContent = prev;
+          });
+        }
       }
     }
 
@@ -1788,6 +2039,40 @@
     document.getElementById('appContainer').classList.remove('active');
     document.getElementById('authEmail').value = '';
     document.getElementById('authPassword').value = '';
+  });
+
+  // Show the "get the extension" banner only when the extension isn't installed
+  // (the bridge content script sets data-otto-ext shortly after load).
+  setTimeout(() => {
+    const b = document.getElementById('extBanner');
+    if (b && !document.documentElement.hasAttribute('data-otto-ext')) b.style.display = 'block';
+  }, 2500);
+
+  // --- Otto Chrome extension integration ---
+  // The extension's bridge content script posts a grabbed vehicle into the page.
+  window.addEventListener('message', (ev) => {
+    if (ev.source !== window || !ev.data || ev.data.type !== 'OTTO_EXT_GRAB') return;
+    if (window.__ottoGrabHandled) return; // bridge retries the post; handle once
+    window.__ottoGrabHandled = true;
+    const g = ev.data.payload || {};
+    const v = g.vehicle || {};
+    const setV = (id, val) => { const el = document.getElementById(id); if (el && val) el.value = val; };
+    setV('dealershipUrl', g.sourceUrl);
+    setV('vehicleYear', v.year);
+    setV('vehicleMake', v.make);
+    setV('vehicleModel', v.model);
+    setV('vehicleMileage', v.mileage);
+    setV('vehiclePrice', v.price);
+    if (v.color) {
+      const f = document.getElementById('vehicleFeatures');
+      if (f && !f.value) f.value = v.color + ' exterior';
+    }
+    appState.scrapedImages = (g.images || []).slice(0, 12);
+    appState.scrapedVideos = (g.videos || []).slice(0, 5);
+    showStatus('✅ Imported from your dealership page: ' + appState.scrapedImages.length + ' photos'
+      + (appState.scrapedVideos.length ? ' + ' + appState.scrapedVideos.length + ' video(s)' : '')
+      + '. Review the fields and click Generate listing!', 'success');
+    try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) {}
   });
 
   window.addEventListener('load', () => {
