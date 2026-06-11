@@ -70,8 +70,11 @@ export default async function handler(req, res) {
       year: f('year'), make: f('make'), model: f('model'), trim: f('trim'),
       miles: f('miles'), price: f('price'), color: f('color'), cond: f('cond'),
       features: f('features'), rep: f('rep'), phone: f('phone'),
-      city: f('city'), tone: f('tone') || 'friendly'
+      booking: f('booking'), city: f('city'), tone: f('tone') || 'friendly'
     };
+    // Only treat booking as usable if it's a real http(s) link with no chars
+    // that could break out of the prompt/JSON (defense-in-depth on self-input)
+    const bookingUrl = (/^https?:\/\/\S+$/i.test(v.booking) && !/["'{}<>]/.test(v.booking)) ? v.booking : '';
 
     if (!(v.year || v.make || v.model)) {
       res.status(400).json({ ok: false, error: 'missing_vehicle' });
@@ -90,6 +93,7 @@ Condition: ${v.cond || 'n/a'}
 Features: ${v.features || 'n/a'}
 Salesperson name: ${v.rep || 'n/a'}
 Contact (phone/text): ${v.phone || 'n/a'}
+Booking link: ${bookingUrl || 'n/a'}
 Market/City: ${v.city || 'n/a'}
 
 Return a JSON object with EXACTLY these keys:
@@ -101,7 +105,7 @@ Return a JSON object with EXACTLY these keys:
 - "craigslist": a plain-text Craigslist post — NO emojis, include contact info
 - "hashtags": an array of 8-12 relevant hashtag strings (include the make, model, and city if given, plus common car-sales tags)
 
-Only use the contact info that was provided. Do not fabricate anything not listed above.`;
+Only use the contact info that was provided. Do not fabricate anything not listed above.${bookingUrl ? ` IMPORTANT: A booking link was provided (${bookingUrl}). In the call-to-action of "marketplace", "facebook", and "craigslist", invite the buyer to book a test drive at that exact link (e.g. "Book a test drive: ${bookingUrl}"). Use the URL verbatim — do not alter, shorten, or invent a different link. Keep "reel" and "tiktok" short; mentioning the link there is optional.` : ''}`;
 
     const aiRes = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',

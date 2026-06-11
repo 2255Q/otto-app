@@ -1012,6 +1012,8 @@
           <label style="font-weight: 600;">Your info — every post signs off with this, so leads come to YOU</label>
           <input type="text" id="repName" placeholder="Your name (e.g., Sal Altoum)" style="margin-top: 8px;" />
           <input type="tel" id="repPhone" placeholder="Your cell for calls/texts (e.g., 904-315-8080)" style="margin-top: 8px;" />
+          <input type="url" id="repBooking" placeholder="Booking link (optional, e.g., calendly.com/sal)" style="margin-top: 8px;" />
+          <div style="font-size: 11px; color: var(--gray); margin-top: 6px;">Add a Calendly or Google Calendar link and Otto invites buyers to book a test drive — straight onto your calendar.</div>
         </div>
 
         <div class="form-group">
@@ -1600,7 +1602,10 @@
     // dealership's main line. Persisted locally so it's filled in once.
     const repName = (document.getElementById('repName')?.value || '').trim();
     const repPhone = (document.getElementById('repPhone')?.value || '').trim();
-    try { localStorage.setItem('otto_rep', JSON.stringify({ name: repName, phone: repPhone })); } catch (e) {}
+    let repBooking = (document.getElementById('repBooking')?.value || '').trim();
+    // Normalize a bare domain (calendly.com/sal) into a real URL
+    if (repBooking && !/^https?:\/\//i.test(repBooking)) repBooking = 'https://' + repBooking;
+    try { localStorage.setItem('otto_rep', JSON.stringify({ name: repName, phone: repPhone, booking: repBooking })); } catch (e) {}
     if (!repName || !repPhone) {
       showStatus('Add your name and cell number first — that\'s how buyers reach YOU.', 'error');
       document.getElementById('repName')?.focus();
@@ -1621,7 +1626,7 @@
         body: JSON.stringify({
           year, make, model, trim, color,
           miles: mileage, price, features, cond: history,
-          rep: repName, phone: repPhone,
+          rep: repName, phone: repPhone, booking: repBooking,
         }),
       });
 
@@ -2104,6 +2109,7 @@
       const rep = JSON.parse(localStorage.getItem('otto_rep') || '{}');
       if (rep.name) document.getElementById('repName').value = rep.name;
       if (rep.phone) document.getElementById('repPhone').value = rep.phone;
+      if (rep.booking) document.getElementById('repBooking').value = rep.booking;
     } catch (e) {}
   });
 
