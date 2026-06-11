@@ -1913,6 +1913,10 @@
             </div>
           `).join('')}
         </div>
+        <div style="margin-top: 12px;">
+          <button id="makeReelBtn" class="btn btn-ghost" style="width: 100%;">🎬 Make a video for Reels &amp; TikTok</button>
+          <div id="reelArea" style="display: none; margin-top: 10px;"></div>
+        </div>
         ${videosHtml}
       </div>`;
     }
@@ -2008,6 +2012,8 @@
           btn.addEventListener('click', () =>
             downloadCarImage(btn.getAttribute('data-dl'), btn.getAttribute('data-dl-idx'), btn));
         });
+        const reelBtn = imageContainer.querySelector('#makeReelBtn');
+        if (reelBtn) reelBtn.addEventListener('click', () => makeReelVideo(reelBtn));
         const dlAll = imageContainer.querySelector('#dlAllBtn');
         if (dlAll) dlAll.addEventListener('click', async () => {
           // One ZIP instead of N separate downloads: unzip → select all → one drag onto Facebook.
@@ -2117,6 +2123,127 @@
       showStatus('Could not download that photo. Try right-click → Save Image.', 'error');
     } finally {
       if (btn) { btn.disabled = false; btn.textContent = prev; }
+    }
+  }
+
+  // ==================== REELS / TIKTOK VIDEO MAKER ====================
+  // Builds a silent vertical slideshow from the car photos (price + contact
+  // overlaid). Photos are fetched through our proxy first so the canvas isn't
+  // CORS-tainted (which would block video export). No music by design — the
+  // salesperson adds a trending sound inside TikTok/Instagram (free + legal).
+  async function makeReelVideo(btn) {
+    const reelArea = document.getElementById('reelArea');
+    if (!reelArea) return;
+    const supported = typeof MediaRecorder !== 'undefined'
+      && HTMLCanvasElement.prototype.captureStream;
+    if (!supported) {
+      reelArea.style.display = 'block';
+      reelArea.innerHTML = '<div style="font-size:13px;color:var(--gray);">Your browser can\'t build videos here. Tip: download the photos and turn them into a slideshow right inside the TikTok or Instagram app.</div>';
+      return;
+    }
+    const lab = btn.textContent;
+    btn.disabled = true; btn.textContent = 'Loading photos…';
+    reelArea.style.display = 'block'; reelArea.innerHTML = '';
+    const created = [];
+    try {
+      const cont = btn.closest('[data-image-container]') || document;
+      const urls = [...cont.querySelectorAll('[data-dl]')]
+        .filter(b => { const c = b.closest('[data-img-cell]'); return !c || c.style.display !== 'none'; })
+        .map(b => b.getAttribute('data-dl')).slice(0, 6);
+      if (!urls.length) throw new Error('no photos');
+      const imgs = [];
+      for (const u of urls) {
+        try {
+          const blob = await fetchPhotoBlob(u);
+          const url = URL.createObjectURL(blob); created.push(url);
+          const im = await new Promise((res, rej) => { const x = new Image(); x.onload = () => res(x); x.onerror = rej; x.src = url; });
+          imgs.push(im);
+        } catch (e) { /* skip a photo that fails */ }
+      }
+      if (!imgs.length) throw new Error('photos failed to load');
+      btn.textContent = 'Making video…';
+
+      const val = id => (document.getElementById(id) && document.getElementById(id).value || '').trim();
+      const title = [val('vehicleYear'), val('vehicleMake'), val('vehicleModel')].filter(Boolean).join(' ');
+      const priceNum = Number(val('vehiclePrice').replace(/[^0-9.]/g, ''));
+      const price = priceNum > 0 ? '$' + priceNum.toLocaleString() : '';
+      const rep = val('repName'); const phone = val('repPhone');
+      const contact = [rep, phone].filter(Boolean).join('  •  ');
+
+      const W = 720, H = 1280;
+      const canvas = document.createElement('canvas'); canvas.width = W; canvas.height = H;
+      const ctx = canvas.getContext('2d');
+      const stream = canvas.captureStream(30);
+      const mime = ['video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm']
+        .find(t => { try { return MediaRecorder.isTypeSupported(t); } catch (e) { return false; } }) || '';
+      const rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+      const chunks = []; rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+      const stopped = new Promise(res => { rec.onstop = res; });
+      rec.start();
+
+      const per = 2200, fade = 450;
+      const drawCover = (im, alpha, zoom) => {
+        const ir = im.width / im.height, cr = W / H; let dw, dh;
+        if (ir > cr) { dh = H * zoom; dw = dh * ir; } else { dw = W * zoom; dh = dw / ir; }
+        ctx.globalAlpha = alpha; ctx.drawImage(im, (W - dw) / 2, (H - dh) / 2, dw, dh); ctx.globalAlpha = 1;
+      };
+      const overlay = () => {
+        const grad = ctx.createLinearGradient(0, H * 0.5, 0, H);
+        grad.addColorStop(0, 'rgba(0,0,0,0)'); grad.addColorStop(1, 'rgba(0,0,0,0.8)');
+        ctx.fillStyle = grad; ctx.fillRect(0, H * 0.5, W, H * 0.5);
+        ctx.textAlign = 'left'; ctx.fillStyle = '#fff';
+        let y = H - 210;
+        if (title) { ctx.font = '700 44px -apple-system,Segoe UI,Roboto,sans-serif'; ctx.fillText(title, 44, y); y += 70; }
+        if (price) { ctx.font = '800 64px -apple-system,Segoe UI,Roboto,sans-serif'; ctx.fillStyle = '#8fe3b0'; ctx.fillText(price, 44, y); y += 64; ctx.fillStyle = '#fff'; }
+        if (contact) { ctx.font = '600 32px -apple-system,Segoe UI,Roboto,sans-serif'; ctx.fillText('Call or text  ' + contact, 44, y); }
+        ctx.font = '700 26px -apple-system,Segoe UI,Roboto,sans-serif'; ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.textAlign = 'right';
+        ctx.fillText('Otto', W - 28, 48); ctx.textAlign = 'left';
+      };
+
+      const start = performance.now(); const total = imgs.length * per;
+      await new Promise(resolve => {
+        function frame(now) {
+          const t = now - start; if (t >= total) { resolve(); return; }
+          const idx = Math.min(imgs.length - 1, Math.floor(t / per));
+          const localT = t - idx * per;
+          ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+          drawCover(imgs[idx], 1, 1.06 + 0.10 * (localT / per));
+          if (idx < imgs.length - 1 && localT > per - fade) {
+            drawCover(imgs[idx + 1], (localT - (per - fade)) / fade, 1.06);
+          }
+          overlay();
+          requestAnimationFrame(frame);
+        }
+        requestAnimationFrame(frame);
+      });
+      rec.stop();
+      await stopped;
+
+      const ext = mime.includes('mp4') ? 'mp4' : 'webm';
+      const blob = new Blob(chunks, { type: mime || 'video/webm' });
+      const vurl = URL.createObjectURL(blob); created.push(vurl);
+      const fname = (title || 'car').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '-reel.' + ext;
+      reelArea.innerHTML = '';
+      const vid = document.createElement('video');
+      vid.src = vurl; vid.controls = true; vid.playsInline = true; vid.muted = true;
+      vid.style.cssText = 'width:60%;max-width:230px;border-radius:12px;display:block;margin:0 auto 10px;';
+      const dl = document.createElement('a');
+      dl.href = vurl; dl.download = fname; dl.className = 'btn btn-primary';
+      dl.style.cssText = 'display:block;text-align:center;text-decoration:none;';
+      dl.textContent = '⬇ Download video';
+      const tip = document.createElement('div');
+      tip.style.cssText = 'font-size:12px;color:var(--gray);margin-top:8px;text-align:center;line-height:1.5;';
+      tip.innerHTML = '🎵 Add a trending sound inside TikTok or Instagram when you post — it\'s free, keeps you copyright-safe, and gets you more views.';
+      reelArea.appendChild(vid); reelArea.appendChild(dl); reelArea.appendChild(tip);
+      // Revoke the source-photo object URLs (keep the video URL alive for playback/download)
+      created.slice(0, -1).forEach(u => { try { URL.revokeObjectURL(u); } catch (e) {} });
+      showStatus('Video ready! Download it, then post to Reels or TikTok.', 'success');
+    } catch (e) {
+      console.error('Reel error:', e);
+      created.forEach(u => { try { URL.revokeObjectURL(u); } catch (er) {} });
+      reelArea.innerHTML = '<div style="font-size:13px;color:var(--gray);">Couldn\'t build the video this time. You can still download the photos and make a quick slideshow in the TikTok or Instagram app.</div>';
+    } finally {
+      btn.disabled = false; btn.textContent = lab;
     }
   }
 
