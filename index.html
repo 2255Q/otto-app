@@ -963,9 +963,9 @@
   <div class="wrap nav-in">
     <a class="logo" href="#"><span class="mark">O</span> Otto</a>
     <div class="nav-center">
-      <a href="#">Studio</a>
-      <a href="#">History</a>
-      <a href="#">Analytics</a>
+      <a href="#" id="navStudio">Studio</a>
+      <a href="#" id="navHistory">History</a>
+      <a href="#" id="navAnalytics">Analytics</a>
     </div>
     <div class="nav-right">
       <button class="nav-plan-btn hidden" id="managePlanBtn">Manage plan</button>
@@ -1159,6 +1159,22 @@
 
           <div class="pack-grid" id="packGrid"></div>
         </div>
+      </div>
+    </div>
+
+    <div id="historyView" style="display:none;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:18px;flex-wrap:wrap;">
+        <div>
+          <h2 style="margin:0;">Your saved listings</h2>
+          <p style="margin:4px 0 0;color:var(--gray);font-size:14px;">Reopen any car to re-copy its posts or re-download the photos.</p>
+        </div>
+        <button class="btn btn-ghost" id="historyNewBtn">+ New listing</button>
+      </div>
+      <div id="historyList"></div>
+      <div id="historyEmpty" style="display:none;padding:48px 20px;text-align:center;color:var(--gray);">
+        <div style="font-size:48px;margin-bottom:12px;">🗂️</div>
+        <p>No saved listings yet — every car you generate will be saved here.</p>
+        <button class="btn btn-primary" id="historyEmptyNew" style="margin-top:10px;">Create your first listing</button>
       </div>
     </div>
   </div>
@@ -1396,6 +1412,89 @@
       span.textContent = 'Don\'t have an account? ';
       btn.textContent = 'Create one';
     }
+  }
+
+  // ==================== HISTORY ====================
+  // Saved listings live in localStorage, namespaced per user so two accounts
+  // on the same device never see each other's history.
+  const HISTORY_MAX = 50;
+  function historyKey() {
+    const who = (authState.user && (authState.user.id || authState.user.email)) || 'anon';
+    return 'otto_history_' + who;
+  }
+  function loadHistory() {
+    try { return JSON.parse(localStorage.getItem(historyKey()) || '[]'); } catch (e) { return []; }
+  }
+  function saveHistory(list) {
+    try { localStorage.setItem(historyKey(), JSON.stringify(list.slice(0, HISTORY_MAX))); } catch (e) {}
+  }
+  function addToHistory(vehicle, generated) {
+    if (!generated) return;
+    const list = loadHistory();
+    list.unshift({ id: Date.now(), date: new Date().toISOString(), vehicle, generated });
+    saveHistory(list);
+  }
+
+  function showStudioView() {
+    const s = document.querySelector('.studio'); if (s) s.style.display = '';
+    const h = document.getElementById('historyView'); if (h) h.style.display = 'none';
+  }
+  function showHistoryView() {
+    const s = document.querySelector('.studio'); if (s) s.style.display = 'none';
+    const h = document.getElementById('historyView'); if (h) h.style.display = 'block';
+    renderHistory();
+    window.scrollTo(0, 0);
+  }
+
+  function renderHistory() {
+    const list = loadHistory();
+    const wrap = document.getElementById('historyList');
+    const empty = document.getElementById('historyEmpty');
+    if (!wrap) return;
+    if (!list.length) { wrap.innerHTML = ''; if (empty) empty.style.display = 'block'; return; }
+    if (empty) empty.style.display = 'none';
+    const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const num = s => { const n = Number(String(s).replace(/[^0-9.]/g, '')); return isFinite(n) && n > 0 ? n.toLocaleString() : ''; };
+    wrap.innerHTML = list.map(e => {
+      const v = e.vehicle || {};
+      const img = ((e.generated && e.generated.images) || []).find(u => /^https?:\/\//.test(u)) || '';
+      const title = [v.year, v.make, v.model, v.trim].filter(Boolean).join(' ') || 'Listing';
+      const price = num(v.price) ? '$' + num(v.price) : '';
+      const mi = num(v.mileage) ? num(v.mileage) + ' mi' : '';
+      const d = new Date(e.date); const ds = isNaN(d.getTime()) ? '' : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+      return '<div style="display:flex;gap:14px;align-items:center;background:#fff;border:1px solid var(--line,#e6e6e8);border-radius:14px;padding:12px;margin-bottom:12px;">'
+        + '<div style="width:84px;height:64px;border-radius:10px;background:#eef1f4;flex:none;overflow:hidden;">' + (img ? '<img src="' + esc(img) + '" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display=\'none\'">' : '') + '</div>'
+        + '<div style="flex:1;min-width:0;">'
+        + '<div style="font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(title) + '</div>'
+        + '<div style="font-size:13px;color:#1a9d54;font-weight:600;">' + esc([price, mi].filter(Boolean).join(' · ')) + '</div>'
+        + '<div style="font-size:12px;color:var(--gray);">' + esc(ds) + '</div>'
+        + '</div>'
+        + '<button class="btn btn-primary" data-open="' + e.id + '" style="flex:none;">Open</button>'
+        + '<button data-del="' + e.id + '" title="Delete" aria-label="Delete listing" style="flex:none;background:none;border:0;color:#b0b0b5;font-size:18px;cursor:pointer;">🗑️</button>'
+        + '</div>';
+    }).join('');
+    wrap.querySelectorAll('[data-open]').forEach(b => b.addEventListener('click', () => openHistory(Number(b.getAttribute('data-open')))));
+    wrap.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', () => {
+      if (confirm('Delete this saved listing?')) {
+        saveHistory(loadHistory().filter(x => x.id !== Number(b.getAttribute('data-del'))));
+        renderHistory();
+      }
+    }));
+  }
+
+  function openHistory(id) {
+    const e = loadHistory().find(x => x.id === id);
+    if (!e) return;
+    const v = e.vehicle || {};
+    const set = (elId, val) => { const el = document.getElementById(elId); if (el) el.value = val || ''; };
+    set('vehicleYear', v.year); set('vehicleMake', v.make); set('vehicleModel', v.model);
+    set('vehicleMileage', v.mileage); set('vehiclePrice', v.price);
+    appState.scrapedImages = (e.generated && e.generated.images) || [];
+    appState.lastGenerated = e.generated;
+    showStudioView();
+    displayOutputs(e.generated);
+    const out = document.querySelector('.output-section');
+    if (out) out.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   // ==================== SUBSCRIPTION ====================
@@ -1679,6 +1778,7 @@
         images: displayImages
       };
       displayOutputs(appState.lastGenerated);
+      addToHistory({ year, make, model, trim, color, price, mileage }, appState.lastGenerated);
       showStatus(appState.scrapedImages?.length ? '✅ Listing generated with dealership photos!' : 'Listing generated!', 'success');
     } catch (e) {
       console.error('Generate error:', e);
@@ -1996,6 +2096,13 @@
   document.getElementById('authSignUp').addEventListener('click', handleSignUp);
   document.getElementById('toggleBtn').addEventListener('click', toggleAuthMode);
   document.getElementById('scrapeBtn').addEventListener('click', handleScrape);
+
+  // Nav: Studio / History / Analytics
+  document.getElementById('navStudio').addEventListener('click', (e) => { e.preventDefault(); showStudioView(); });
+  document.getElementById('navHistory').addEventListener('click', (e) => { e.preventDefault(); showHistoryView(); });
+  document.getElementById('navAnalytics').addEventListener('click', (e) => { e.preventDefault(); showStatus('Analytics is coming soon.', 'success'); });
+  document.getElementById('historyNewBtn').addEventListener('click', showStudioView);
+  document.getElementById('historyEmptyNew').addEventListener('click', showStudioView);
 
   ['authEmail', 'authPassword'].forEach(id => {
     document.getElementById(id).addEventListener('keypress', (e) => {
