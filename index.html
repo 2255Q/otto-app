@@ -1003,8 +1003,16 @@
           <button class="btn btn-ghost" id="scrapeBtn" style="margin-top: 8px; width: 100%;">Auto-fill from URL</button>
         </div>
 
+        <!-- ADD YOUR OWN PHOTOS: works even when a dealer site blocks the scraper -->
+        <div class="form-group">
+          <button type="button" class="btn btn-ghost" id="addPhotosBtn" style="width: 100%;">📷 Add your own photos</button>
+          <input type="file" id="photoInput" accept="image/*" multiple style="display: none;" />
+          <div id="uploadedStrip" style="display: none; flex-wrap: wrap; gap: 8px; margin-top: 10px;"></div>
+          <div style="font-size: 11px; color: var(--gray); margin-top: 6px;">Photos didn't load from the link, or want to use your own? Add them from your phone or computer — they'll appear with your posts, ready to download.</div>
+        </div>
+
         <div style="margin: 16px 0; padding: 12px; background: var(--bg-soft); border-radius: 8px; font-size: 12px; color: var(--gray);">
-          💡 <strong>Tip:</strong> Paste a dealership listing URL to auto-fill vehicle details and images.
+          💡 <strong>Tip:</strong> Paste a dealership listing URL to auto-fill details and photos — or add your own photos above.
         </div>
 
         <!-- SALESPERSON INFO: goes on every post so leads come to YOU -->
@@ -1430,8 +1438,13 @@
   }
   function addToHistory(vehicle, generated) {
     if (!generated) return;
+    // Only persist http(s) photos — uploaded blob: URLs are session-only and
+    // would be dead on reload (and base64 would blow the localStorage quota).
+    const safe = Object.assign({}, generated, {
+      images: (generated.images || []).filter(u => /^https?:\/\//i.test(String(u)))
+    });
     const list = loadHistory();
-    list.unshift({ id: Date.now(), date: new Date().toISOString(), vehicle, generated });
+    list.unshift({ id: Date.now(), date: new Date().toISOString(), vehicle, generated: safe });
     saveHistory(list);
   }
 
@@ -1489,6 +1502,7 @@
     const set = (elId, val) => { const el = document.getElementById(elId); if (el) el.value = val || ''; };
     set('vehicleYear', v.year); set('vehicleMake', v.make); set('vehicleModel', v.model);
     set('vehicleMileage', v.mileage); set('vehiclePrice', v.price);
+    clearUploadedPhotos(); // those blob URLs belonged to a different session
     appState.scrapedImages = (e.generated && e.generated.images) || [];
     appState.lastGenerated = e.generated;
     showStudioView();
@@ -1734,9 +1748,11 @@
       const textData = await textRes.json();
 
       // Real dealership photos take priority — only fall back to AI image
-      // generation when no scraped photos are available.
+      // generation when no scraped AND no uploaded photos are available.
       let imageUrl = null;
-      if (!appState.scrapedImages || appState.scrapedImages.length === 0) {
+      const hasScraped = appState.scrapedImages && appState.scrapedImages.length > 0;
+      const hasUploaded = appState.uploadedImages && appState.uploadedImages.length > 0;
+      if (!hasScraped && !hasUploaded) {
         try {
           const imageRes = await authedFetch('/api/generate-image', {
             method: 'POST',
@@ -1752,10 +1768,9 @@
         }
       }
 
-      // Use scraped images if available, otherwise use generated image
-      const displayImages = appState.scrapedImages && appState.scrapedImages.length > 0
-        ? appState.scrapedImages
-        : (imageUrl ? [imageUrl] : []);
+      // Uploaded photos first, then scraped (or AI fallback)
+      const baseImages = hasScraped ? appState.scrapedImages : (imageUrl ? [imageUrl] : []);
+      const displayImages = combinedImages(baseImages);
 
       // /api/generate nests content under `result`:
       // { marketplaceTitle, marketplace, facebook, reel, tiktok, craigslist, hashtags }
@@ -1803,8 +1818,8 @@
     let imagesHtml = '';
     if (data.images && data.images.length > 0) {
       const imageUrls = data.images
-        .filter(img => /^https?:\/\//i.test(String(img)))
-        .slice(0, 6); // Show up to 6 images
+        .filter(img => /^(https?:|blob:)/i.test(String(img)))
+        .slice(0, 8); // up to 8 (uploaded + scraped)
       const vids = appState.scrapedVideos || [];
       const videosHtml = vids.length === 0 ? '' : `<div style="margin-top: 10px; font-size: 12px; color: var(--gray);">
         🎬 Dealer video${vids.length > 1 ? 's' : ''} found — use for Marketplace (max 1 min), Reels &amp; TikTok:
@@ -1890,7 +1905,7 @@
             year: vYear, make: vMake, model: vModel,
             mileage: fbMileage, price: vPrice,
             description: data.marketplace || data.facebook || '',
-            images: (data.images || []).slice(0, 20),
+            images: (data.images || []).filter(u => /^https?:\/\//i.test(String(u))).slice(0, 20),
           },
         }, window.location.origin);
       };
@@ -1943,10 +1958,11 @@
               .filter(b => b.closest('[data-img-cell]').style.display !== 'none');
             let added = 0;
             for (const b of btns) {
-              const res = await authedFetch('/api/download-image?src=' + encodeURIComponent(b.getAttribute('data-dl')));
-              if (!res.ok) continue;
-              zip.file('car-photo-' + b.getAttribute('data-dl-idx') + '.jpg', await res.blob());
-              added++;
+              try {
+                const blob = await fetchPhotoBlob(b.getAttribute('data-dl'));
+                zip.file('car-photo-' + b.getAttribute('data-dl-idx') + '.jpg', blob);
+                added++;
+              } catch (e) { /* skip photos that fail */ }
             }
             if (!added) throw new Error('no photos could be fetched');
             const blob = await zip.generateAsync({ type: 'blob' });
@@ -1988,10 +2004,10 @@
                 .filter(b => b.closest('[data-img-cell]').style.display !== 'none');
               const files = [];
               for (const b of btns) {
-                const res = await authedFetch('/api/download-image?src=' + encodeURIComponent(b.getAttribute('data-dl')));
-                if (!res.ok) continue;
-                const blob = await res.blob();
-                files.push(new File([blob], 'car-photo-' + b.getAttribute('data-dl-idx') + '.jpg', { type: blob.type || 'image/jpeg' }));
+                try {
+                  const blob = await fetchPhotoBlob(b.getAttribute('data-dl'));
+                  files.push(new File([blob], 'car-photo-' + b.getAttribute('data-dl-idx') + '.jpg', { type: blob.type || 'image/jpeg' }));
+                } catch (e) { /* skip */ }
               }
               if (!files.length) throw new Error('no photos could be fetched');
               await navigator.share({ files });
@@ -2019,9 +2035,7 @@
     const prev = btn && btn.textContent;
     if (btn) { btn.disabled = true; btn.textContent = '…'; }
     try {
-      const res = await authedFetch('/api/download-image?src=' + encodeURIComponent(url));
-      if (!res.ok) throw new Error('download failed');
-      const blob = await res.blob();
+      const blob = await fetchPhotoBlob(url);
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = 'car-photo-' + (idx || 1) + '.jpg';
@@ -2035,6 +2049,70 @@
     } finally {
       if (btn) { btn.disabled = false; btn.textContent = prev; }
     }
+  }
+
+  // ==================== ADD YOUR OWN PHOTOS ====================
+  // Lets a salesperson add photos from their device — works even when a
+  // dealer site blocks the scraper, or when they have better photos.
+  const MAX_UPLOADS = 12;
+  function handleAddPhotos(fileList) {
+    appState.uploadedImages = appState.uploadedImages || [];
+    const files = [...(fileList || [])].filter(f => f && f.type && f.type.startsWith('image/'));
+    files.forEach(f => {
+      if (appState.uploadedImages.length >= MAX_UPLOADS) return;
+      appState.uploadedImages.push(URL.createObjectURL(f));
+    });
+    renderUploadedStrip();
+    if (appState.lastGenerated) {
+      appState.lastGenerated.images = combinedImages(appState.lastGenerated.images);
+      displayOutputs(appState.lastGenerated);
+    }
+  }
+  function renderUploadedStrip() {
+    const strip = document.getElementById('uploadedStrip');
+    const imgs = appState.uploadedImages || [];
+    if (!strip) return;
+    if (!imgs.length) { strip.style.display = 'none'; strip.innerHTML = ''; return; }
+    strip.style.display = 'flex';
+    strip.innerHTML = imgs.map((u, i) =>
+      '<div style="position:relative;width:56px;height:56px;border-radius:8px;overflow:hidden;border:1px solid var(--line,#e6e6e8);">'
+      + '<img src="' + u + '" style="width:100%;height:100%;object-fit:cover;">'
+      + '<button data-rm="' + i + '" aria-label="Remove photo" style="position:absolute;top:0;right:0;background:rgba(0,0,0,.6);color:#fff;border:0;width:18px;height:18px;font-size:12px;line-height:1;cursor:pointer;">×</button>'
+      + '</div>').join('');
+    strip.querySelectorAll('[data-rm]').forEach(b => b.addEventListener('click', () => {
+      const i = Number(b.getAttribute('data-rm'));
+      const removed = (appState.uploadedImages || []).splice(i, 1)[0];
+      if (removed && String(removed).startsWith('blob:')) { try { URL.revokeObjectURL(removed); } catch (e) {} }
+      renderUploadedStrip();
+      if (appState.lastGenerated) {
+        appState.lastGenerated.images = combinedImages(appState.lastGenerated.images);
+        displayOutputs(appState.lastGenerated);
+      }
+    }));
+  }
+  // Uploaded (local) photos first, then remote http photos — de-duped of blobs
+  function combinedImages(remote) {
+    const up = appState.uploadedImages || [];
+    const rem = (remote || []).filter(u => /^https?:\/\//i.test(String(u)));
+    return [...up, ...rem];
+  }
+  function clearUploadedPhotos() {
+    (appState.uploadedImages || []).forEach(u => {
+      if (String(u).startsWith('blob:')) { try { URL.revokeObjectURL(u); } catch (e) {} }
+    });
+    appState.uploadedImages = [];
+    renderUploadedStrip();
+  }
+  // Get a photo's bytes: local (blob/data) fetched directly, remote via our proxy
+  async function fetchPhotoBlob(url) {
+    if (/^(blob:|data:)/i.test(url)) {
+      const r = await fetch(url);
+      if (!r.ok) throw new Error('local photo read failed');
+      return await r.blob();
+    }
+    const r = await authedFetch('/api/download-image?src=' + encodeURIComponent(url));
+    if (!r.ok) throw new Error('download failed');
+    return await r.blob();
   }
 
   function displayPackGrid(pack) {
@@ -2096,6 +2174,13 @@
   document.getElementById('authSignUp').addEventListener('click', handleSignUp);
   document.getElementById('toggleBtn').addEventListener('click', toggleAuthMode);
   document.getElementById('scrapeBtn').addEventListener('click', handleScrape);
+
+  // Add-your-own-photos
+  document.getElementById('addPhotosBtn').addEventListener('click', () => document.getElementById('photoInput').click());
+  document.getElementById('photoInput').addEventListener('change', (e) => {
+    handleAddPhotos(e.target.files);
+    e.target.value = ''; // allow re-selecting the same file
+  });
 
   // Nav: Studio / History / Analytics
   document.getElementById('navStudio').addEventListener('click', (e) => { e.preventDefault(); showStudioView(); });
