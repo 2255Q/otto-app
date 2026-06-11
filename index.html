@@ -984,16 +984,16 @@
   <div class="app-content wrap">
     <div class="status-message" id="statusMessage"></div>
 
-    <!-- FIRST-TIME WALKTHROUGH: shown once to brand-new salespeople -->
-    <div id="welcomePanel" style="display: none; margin: 0 0 20px; padding: 22px; border: 1px solid var(--line, #e6e6e8); border-radius: 16px; background: #fff;">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
-        <div style="font-size: 18px; font-weight: 700;">👋 Welcome to Otto — your first post in 3 steps</div>
-        <button id="welcomeDismiss" style="background: none; border: 0; color: var(--gray); font-size: 13px; cursor: pointer; padding: 8px 10px; min-height: 34px;">Got it ✕</button>
+    <!-- FIRST-TIME WALKTHROUGH: compact one-liner, shown once to new salespeople -->
+    <div id="welcomePanel" style="display: none; margin: 0 0 14px; padding: 12px 14px; border: 1px solid var(--line, #e6e6e8); border-radius: 12px; background: #f7faff;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+        <div style="font-size: 14px; font-weight: 700;">👋 New here? Your first post in 3 quick steps</div>
+        <button id="welcomeDismiss" style="background: none; border: 0; color: var(--gray); font-size: 13px; cursor: pointer; padding: 6px 8px; min-height: 32px;">Got it ✕</button>
       </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-top:14px;">
-        <div style="display:flex;gap:10px;"><div style="flex:none;width:26px;height:26px;border-radius:8px;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;">1</div><div style="font-size:13px;color:var(--gray);line-height:1.5;"><strong style="color:var(--ink,#1d1d1f);">Add your info</strong><br>Your name &amp; cell — every post signs off with it, so leads come to you.</div></div>
-        <div style="display:flex;gap:10px;"><div style="flex:none;width:26px;height:26px;border-radius:8px;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;">2</div><div style="font-size:13px;color:var(--gray);line-height:1.5;"><strong style="color:var(--ink,#1d1d1f);">Add the car</strong><br>Paste a dealership link, or add your own photos and type the details.</div></div>
-        <div style="display:flex;gap:10px;"><div style="flex:none;width:26px;height:26px;border-radius:8px;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;">3</div><div style="font-size:13px;color:var(--gray);line-height:1.5;"><strong style="color:var(--ink,#1d1d1f);">Generate &amp; post</strong><br>Copy the posts, save the photos, and share on your socials.</div></div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:8px;font-size:12px;color:var(--gray);line-height:1.4;">
+        <span><strong style="color:var(--accent);">1.</strong> Add your info</span>
+        <span><strong style="color:var(--accent);">2.</strong> Add the car — link or photos</span>
+        <span><strong style="color:var(--accent);">3.</strong> Generate &amp; post</span>
       </div>
     </div>
 
