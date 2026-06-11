@@ -2232,14 +2232,41 @@
       const vid = document.createElement('video');
       vid.src = vurl; vid.controls = true; vid.playsInline = true; vid.muted = true;
       vid.style.cssText = 'width:60%;max-width:230px;border-radius:12px;display:block;margin:0 auto 10px;';
+      reelArea.appendChild(vid);
+
+      // On phones: one-tap save to the camera roll via the share sheet, so the
+      // video is ready to attach in TikTok/Instagram. Desktop gets a download.
+      let canShareVideo = false;
+      try {
+        const probe = new File([blob], fname, { type: blob.type || 'video/mp4' });
+        canShareVideo = !!(navigator.canShare && navigator.canShare({ files: [probe] }));
+      } catch (e) { canShareVideo = false; }
+      if (canShareVideo) {
+        const share = document.createElement('button');
+        share.className = 'btn btn-primary';
+        share.style.cssText = 'display:block;width:100%;text-align:center;';
+        share.textContent = '📲 Save video to phone';
+        share.addEventListener('click', async () => {
+          share.disabled = true; const pv = share.textContent; share.textContent = 'Opening…';
+          try {
+            await navigator.share({ files: [new File([blob], fname, { type: blob.type || 'video/mp4' })], title: title || 'Otto video' });
+            showStatus('Pick "Save Video" to drop it in your camera roll, ready for TikTok/Reels.', 'success');
+          } catch (err) {
+            if (!err || err.name !== 'AbortError') showStatus('Couldn\'t open the share sheet — use Download instead.', 'error');
+          }
+          share.disabled = false; share.textContent = pv;
+        });
+        reelArea.appendChild(share);
+      }
+
       const dl = document.createElement('a');
-      dl.href = vurl; dl.download = fname; dl.className = 'btn btn-primary';
-      dl.style.cssText = 'display:block;text-align:center;text-decoration:none;';
+      dl.href = vurl; dl.download = fname; dl.className = canShareVideo ? 'btn btn-ghost' : 'btn btn-primary';
+      dl.style.cssText = 'display:block;text-align:center;text-decoration:none;margin-top:8px;';
       dl.textContent = '⬇ Download video';
       const tip = document.createElement('div');
       tip.style.cssText = 'font-size:12px;color:var(--gray);margin-top:8px;text-align:center;line-height:1.5;';
       tip.innerHTML = '🎵 Add a trending sound inside TikTok or Instagram when you post — it\'s free, keeps you copyright-safe, and gets you more views.';
-      reelArea.appendChild(vid); reelArea.appendChild(dl); reelArea.appendChild(tip);
+      reelArea.appendChild(dl); reelArea.appendChild(tip);
       // Revoke the source-photo object URLs (keep the video URL alive for playback/download)
       created.slice(0, -1).forEach(u => { try { URL.revokeObjectURL(u); } catch (e) {} });
       showStatus('Video ready! Download it, then post to Reels or TikTok.', 'success');
