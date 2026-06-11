@@ -978,9 +978,15 @@
   <div class="app-content wrap">
     <div class="status-message" id="statusMessage"></div>
 
-    <div id="extBanner" style="display: none; margin: 0 0 18px; padding: 12px 16px; border: 1px solid var(--line); border-radius: 14px; background: #f0f7ff; font-size: 13px; line-height: 1.5;">
-      ⚡ <strong>Get the Otto button for Chrome</strong> — grab any car straight from your dealership's website and let Otto fill the Facebook Marketplace form for you.
-      <a href="https://chromewebstore.google.com/detail/ejillngakcjjjhomnkbgbimfllkojpbl" target="_blank" rel="noopener" style="color: var(--accent); font-weight: 600;">Add to Chrome ↗</a>
+    <div id="extBanner" style="display: none; margin: 0 0 20px; padding: 18px 20px; border: 1px solid #cfe3ff; border-radius: 16px; background: linear-gradient(120deg,#eef6ff,#f7fbff); display: none; align-items: center; gap: 18px; flex-wrap: wrap;">
+      <div style="flex: 1; min-width: 240px;">
+        <div style="font-size: 16px; font-weight: 700; margin-bottom: 4px;">⚡ Get the Otto button for Chrome</div>
+        <div style="font-size: 13px; color: var(--gray); line-height: 1.5;">Grab any car straight from your dealership's website, and let Otto fill the Facebook Marketplace form for you — fields, description and photos. You just hit Publish.</div>
+      </div>
+      <div style="display: flex; flex-direction: column; align-items: stretch; gap: 6px;">
+        <a href="https://chromewebstore.google.com/detail/ejillngakcjjjhomnkbgbimfllkojpbl" target="_blank" rel="noopener" class="btn btn-primary" style="white-space: nowrap; text-align: center; text-decoration: none;">Add to Chrome — free</a>
+        <button id="extBannerDismiss" style="background: none; border: 0; color: var(--gray); font-size: 12px; cursor: pointer;">Maybe later</button>
+      </div>
     </div>
     <div class="studio">
       <!-- INPUT PANEL -->
@@ -2045,8 +2051,16 @@
   // (the bridge content script sets data-otto-ext shortly after load).
   setTimeout(() => {
     const b = document.getElementById('extBanner');
-    if (b && !document.documentElement.hasAttribute('data-otto-ext')) b.style.display = 'block';
+    const dismissed = localStorage.getItem('otto_ext_dismissed') === '1';
+    if (b && !dismissed && !document.documentElement.hasAttribute('data-otto-ext')) {
+      b.style.display = 'flex';
+    }
   }, 2500);
+  const extDismiss = document.getElementById('extBannerDismiss');
+  if (extDismiss) extDismiss.addEventListener('click', () => {
+    document.getElementById('extBanner').style.display = 'none';
+    localStorage.setItem('otto_ext_dismissed', '1');
+  });
 
   // --- Otto Chrome extension integration ---
   // The extension's bridge content script posts a grabbed vehicle into the page.
