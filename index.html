@@ -978,6 +978,19 @@
   <div class="app-content wrap">
     <div class="status-message" id="statusMessage"></div>
 
+    <!-- FIRST-TIME WALKTHROUGH: shown once to brand-new salespeople -->
+    <div id="welcomePanel" style="display: none; margin: 0 0 20px; padding: 22px; border: 1px solid var(--line, #e6e6e8); border-radius: 16px; background: #fff;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+        <div style="font-size: 18px; font-weight: 700;">👋 Welcome to Otto — your first post in 3 steps</div>
+        <button id="welcomeDismiss" style="background: none; border: 0; color: var(--gray); font-size: 13px; cursor: pointer;">Got it ✕</button>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-top:14px;">
+        <div style="display:flex;gap:10px;"><div style="flex:none;width:26px;height:26px;border-radius:8px;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;">1</div><div style="font-size:13px;color:var(--gray);line-height:1.5;"><strong style="color:var(--ink,#1d1d1f);">Add your info</strong><br>Your name &amp; cell — every post signs off with it, so leads come to you.</div></div>
+        <div style="display:flex;gap:10px;"><div style="flex:none;width:26px;height:26px;border-radius:8px;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;">2</div><div style="font-size:13px;color:var(--gray);line-height:1.5;"><strong style="color:var(--ink,#1d1d1f);">Add the car</strong><br>Paste a dealership link, or add your own photos and type the details.</div></div>
+        <div style="display:flex;gap:10px;"><div style="flex:none;width:26px;height:26px;border-radius:8px;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;">3</div><div style="font-size:13px;color:var(--gray);line-height:1.5;"><strong style="color:var(--ink,#1d1d1f);">Generate &amp; post</strong><br>Copy the posts, save the photos, and share on your socials.</div></div>
+      </div>
+    </div>
+
     <div id="extBanner" style="display: none; margin: 0 0 20px; padding: 18px 20px; border: 1px solid #cfe3ff; border-radius: 16px; background: linear-gradient(120deg,#eef6ff,#f7fbff); display: none; align-items: center; gap: 18px; flex-wrap: wrap;">
       <div style="flex: 1; min-width: 240px;">
         <div style="font-size: 16px; font-weight: 700; margin-bottom: 4px;">⚡ Get the Otto button for Chrome</div>
@@ -1005,9 +1018,12 @@
 
         <!-- ADD YOUR OWN PHOTOS: works even when a dealer site blocks the scraper -->
         <div class="form-group">
-          <button type="button" class="btn btn-ghost" id="addPhotosBtn" style="width: 100%;">📷 Add your own photos</button>
-          <input type="file" id="photoInput" accept="image/*" multiple style="display: none;" />
-          <div id="uploadedStrip" style="display: none; flex-wrap: wrap; gap: 8px; margin-top: 10px;"></div>
+          <div id="photoDrop" style="border: 1.5px dashed #d8dde3; border-radius: 12px; padding: 12px; transition: border-color .15s, background .15s;">
+            <button type="button" class="btn btn-ghost" id="addPhotosBtn" style="width: 100%;">📷 Add your own photos</button>
+            <div id="dropHint" style="text-align: center; font-size: 11px; color: var(--gray); margin-top: 6px;">or drag &amp; drop photos here</div>
+            <input type="file" id="photoInput" accept="image/*" multiple style="display: none;" />
+            <div id="uploadedStrip" style="display: none; flex-wrap: wrap; gap: 8px; margin-top: 10px;"></div>
+          </div>
           <div style="font-size: 11px; color: var(--gray); margin-top: 6px;">Photos didn't load from the link, or want to use your own? Add them from your phone or computer — they'll appear with your posts, ready to download.</div>
         </div>
 
@@ -1183,6 +1199,20 @@
         <div style="font-size:48px;margin-bottom:12px;">🗂️</div>
         <p>No saved listings yet — every car you generate will be saved here.</p>
         <button class="btn btn-primary" id="historyEmptyNew" style="margin-top:10px;">Create your first listing</button>
+      </div>
+    </div>
+
+    <div id="analyticsView" style="display:none;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:18px;flex-wrap:wrap;">
+        <div>
+          <h2 style="margin:0;">Your activity</h2>
+          <p style="margin:4px 0 0;color:var(--gray);font-size:14px;">A running count of the work Otto has done for you.</p>
+        </div>
+        <button class="btn btn-ghost" id="analyticsNewBtn">+ New listing</button>
+      </div>
+      <div id="analyticsCards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;"></div>
+      <div style="margin-top:16px;padding:14px;background:var(--bg-soft);border-radius:12px;font-size:13px;color:var(--gray);">
+        📈 Lead and appointment tracking arrives with one-tap auto-posting — coming soon.
       </div>
     </div>
   </div>
@@ -1448,15 +1478,46 @@
     saveHistory(list);
   }
 
-  function showStudioView() {
-    const s = document.querySelector('.studio'); if (s) s.style.display = '';
-    const h = document.getElementById('historyView'); if (h) h.style.display = 'none';
-  }
-  function showHistoryView() {
-    const s = document.querySelector('.studio'); if (s) s.style.display = 'none';
-    const h = document.getElementById('historyView'); if (h) h.style.display = 'block';
-    renderHistory();
+  function setActiveView(view) {
+    const studio = document.querySelector('.studio');
+    const hist = document.getElementById('historyView');
+    const anal = document.getElementById('analyticsView');
+    const welcome = document.getElementById('welcomePanel');
+    const ext = document.getElementById('extBanner');
+    const isStudio = view === 'studio';
+    if (studio) studio.style.display = isStudio ? '' : 'none';
+    if (hist) hist.style.display = view === 'history' ? 'block' : 'none';
+    if (anal) anal.style.display = view === 'analytics' ? 'block' : 'none';
+    // Studio-only banners
+    if (welcome) welcome.style.display = (isStudio && localStorage.getItem('otto_onboarded') !== '1') ? 'block' : 'none';
+    // Ext banner re-shows on return to studio only if it was activated (timer
+    // decided to show it) and not dismissed — avoids a flash for ext users.
+    if (ext) ext.style.display = (isStudio && ext.dataset.active === '1') ? 'flex' : 'none';
+    if (view === 'history') renderHistory();
+    if (view === 'analytics') renderAnalytics();
     window.scrollTo(0, 0);
+  }
+  function showStudioView() { setActiveView('studio'); }
+  function showHistoryView() { setActiveView('history'); }
+  function showAnalyticsView() { setActiveView('analytics'); }
+
+  function renderAnalytics() {
+    const cards = document.getElementById('analyticsCards');
+    if (!cards) return;
+    const list = loadHistory();
+    const weekAgo = Date.now() - 7 * 24 * 3600 * 1000;
+    let posts = 0, photos = 0, week = 0;
+    list.forEach(e => {
+      const g = e.generated || {};
+      ['marketplace', 'facebook', 'instagram', 'tiktok', 'craigslist'].forEach(k => { if (g[k] && String(g[k]).trim()) posts++; });
+      photos += ((g.images) || []).length;
+      const t = new Date(e.date).getTime();
+      if (!isNaN(t) && t >= weekAgo) week++;
+    });
+    const card = (label, val) => '<div style="background:var(--bg-soft);border-radius:12px;padding:16px;">'
+      + '<div style="font-size:13px;color:var(--gray);">' + label + '</div>'
+      + '<div style="font-size:26px;font-weight:700;margin-top:4px;">' + Number(val).toLocaleString() + '</div></div>';
+    cards.innerHTML = card('Cars posted', list.length) + card('Posts written', posts) + card('Photos used', photos) + card('This week', week);
   }
 
   function renderHistory() {
@@ -1623,6 +1684,8 @@
     document.getElementById('appNav').style.display = 'block';
     document.getElementById('appContainer').classList.add('active');
     fetchSubscriptionStatus();
+    // Default to the studio view; shows the welcome panel for new salespeople
+    setActiveView('studio');
   }
 
   function showStatus(message, type) {
@@ -2128,7 +2191,17 @@
       const el = document.createElement('div');
       el.className = 'pack-item';
       el.innerHTML = '<div class="count">' + (idx + 1) + '</div><div class="label">Variation ' + (idx + 1) + '</div>';
-      el.addEventListener('click', () => copyToClipboard(item, 'Variation ' + (idx + 1) + ' copied!'));
+      el.addEventListener('click', () => {
+        copyToClipboard(item, 'Variation ' + (idx + 1) + ' copied!');
+        const lab = el.querySelector('.label');
+        if (lab && !el.dataset.flashing) {
+          el.dataset.flashing = '1';
+          const orig = lab.textContent;
+          lab.textContent = 'Copied ✓';
+          el.style.borderColor = 'var(--success, #1a9d54)';
+          setTimeout(() => { lab.textContent = orig; el.style.borderColor = ''; delete el.dataset.flashing; }, 1200);
+        }
+      });
       grid.appendChild(el);
     });
   }
@@ -2185,9 +2258,35 @@
   // Nav: Studio / History / Analytics
   document.getElementById('navStudio').addEventListener('click', (e) => { e.preventDefault(); showStudioView(); });
   document.getElementById('navHistory').addEventListener('click', (e) => { e.preventDefault(); showHistoryView(); });
-  document.getElementById('navAnalytics').addEventListener('click', (e) => { e.preventDefault(); showStatus('Analytics is coming soon.', 'success'); });
+  document.getElementById('navAnalytics').addEventListener('click', (e) => { e.preventDefault(); showAnalyticsView(); });
   document.getElementById('historyNewBtn').addEventListener('click', showStudioView);
   document.getElementById('historyEmptyNew').addEventListener('click', showStudioView);
+  document.getElementById('analyticsNewBtn').addEventListener('click', showStudioView);
+
+  // First-time walkthrough dismiss
+  const welcomeDismissBtn = document.getElementById('welcomeDismiss');
+  if (welcomeDismissBtn) welcomeDismissBtn.addEventListener('click', () => {
+    localStorage.setItem('otto_onboarded', '1');
+    const wp = document.getElementById('welcomePanel'); if (wp) wp.style.display = 'none';
+  });
+
+  // Drag & drop photos onto the photo zone
+  const photoDrop = document.getElementById('photoDrop');
+  if (photoDrop) {
+    const hi = () => { photoDrop.style.borderColor = 'var(--accent)'; photoDrop.style.background = '#f0f7ff'; };
+    const lo = () => { photoDrop.style.borderColor = '#d8dde3'; photoDrop.style.background = ''; };
+    ['dragenter', 'dragover'].forEach(ev => photoDrop.addEventListener(ev, (e) => { e.preventDefault(); e.stopPropagation(); hi(); }));
+    ['dragleave', 'dragend'].forEach(ev => photoDrop.addEventListener(ev, (e) => { e.preventDefault(); e.stopPropagation(); lo(); }));
+    photoDrop.addEventListener('drop', (e) => {
+      e.preventDefault(); e.stopPropagation(); lo();
+      if (e.dataTransfer && e.dataTransfer.files) handleAddPhotos(e.dataTransfer.files);
+    });
+  }
+  // Don't let a missed drop navigate the page away to the image file
+  ['dragover', 'drop'].forEach(ev => window.addEventListener(ev, (e) => {
+    if (e.target && e.target.id === 'photoInput') return;
+    e.preventDefault();
+  }));
 
   ['authEmail', 'authPassword'].forEach(id => {
     document.getElementById(id).addEventListener('keypress', (e) => {
@@ -2249,13 +2348,17 @@
   setTimeout(() => {
     const b = document.getElementById('extBanner');
     const dismissed = localStorage.getItem('otto_ext_dismissed') === '1';
+    const inStudio = !document.querySelector('.studio') || document.querySelector('.studio').style.display !== 'none';
     if (b && !dismissed && !document.documentElement.hasAttribute('data-otto-ext')) {
-      b.style.display = 'flex';
+      b.dataset.active = '1'; // remember it should show in studio
+      if (inStudio) b.style.display = 'flex';
     }
   }, 2500);
   const extDismiss = document.getElementById('extBannerDismiss');
   if (extDismiss) extDismiss.addEventListener('click', () => {
-    document.getElementById('extBanner').style.display = 'none';
+    const b = document.getElementById('extBanner');
+    b.style.display = 'none';
+    b.dataset.active = '0';
     localStorage.setItem('otto_ext_dismissed', '1');
   });
 
