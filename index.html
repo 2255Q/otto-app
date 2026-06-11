@@ -353,7 +353,7 @@
       padding: 12px 14px;
       border: 1px solid var(--line);
       border-radius: 12px;
-      font-size: 15px;
+      font-size: 16px; /* 16px prevents iOS Safari zoom-on-focus */
       transition: border-color 0.2s;
     }
 
@@ -574,7 +574,7 @@
       padding: 12px 14px;
       border: 1px solid var(--line);
       border-radius: 12px;
-      font-size: 14px;
+      font-size: 16px; /* 16px prevents iOS Safari zoom-on-focus */
       transition: border-color 0.2s;
     }
 
@@ -707,8 +707,8 @@
     .copy-chip {
       display: inline-flex; align-items: center; gap: 5px;
       border: 1px solid var(--line); border-radius: 999px;
-      background: var(--bg-soft); padding: 5px 11px;
-      font-size: 12px; font-weight: 600; cursor: pointer;
+      background: var(--bg-soft); padding: 8px 12px; min-height: 34px;
+      font-size: 13px; font-weight: 600; cursor: pointer;
       transition: background .15s, border-color .15s;
     }
     .copy-chip:hover { border-color: var(--accent); }
@@ -794,6 +794,12 @@
     }
 
     @media (max-width: 640px) {
+      /* Tighter history rows so the Open + delete buttons never get cut off */
+      #historyList .hist-thumb { width: 60px !important; height: 46px !important; }
+      #historyList .btn { padding: 10px 14px; font-size: 13px; }
+      /* Stack nav links horizontally to save vertical space */
+      .nav-center { flex-direction: row !important; flex-wrap: wrap; }
+
       nav {
         height: auto;
       }
@@ -982,7 +988,7 @@
     <div id="welcomePanel" style="display: none; margin: 0 0 20px; padding: 22px; border: 1px solid var(--line, #e6e6e8); border-radius: 16px; background: #fff;">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
         <div style="font-size: 18px; font-weight: 700;">👋 Welcome to Otto — your first post in 3 steps</div>
-        <button id="welcomeDismiss" style="background: none; border: 0; color: var(--gray); font-size: 13px; cursor: pointer;">Got it ✕</button>
+        <button id="welcomeDismiss" style="background: none; border: 0; color: var(--gray); font-size: 13px; cursor: pointer; padding: 8px 10px; min-height: 34px;">Got it ✕</button>
       </div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-top:14px;">
         <div style="display:flex;gap:10px;"><div style="flex:none;width:26px;height:26px;border-radius:8px;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;">1</div><div style="font-size:13px;color:var(--gray);line-height:1.5;"><strong style="color:var(--ink,#1d1d1f);">Add your info</strong><br>Your name &amp; cell — every post signs off with it, so leads come to you.</div></div>
@@ -1537,14 +1543,14 @@
       const mi = num(v.mileage) ? num(v.mileage) + ' mi' : '';
       const d = new Date(e.date); const ds = isNaN(d.getTime()) ? '' : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
       return '<div style="display:flex;gap:14px;align-items:center;background:#fff;border:1px solid var(--line,#e6e6e8);border-radius:14px;padding:12px;margin-bottom:12px;">'
-        + '<div style="width:84px;height:64px;border-radius:10px;background:#eef1f4;flex:none;overflow:hidden;">' + (img ? '<img src="' + esc(img) + '" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display=\'none\'">' : '') + '</div>'
+        + '<div class="hist-thumb" style="width:84px;height:64px;border-radius:10px;background:#eef1f4;flex:none;overflow:hidden;">' + (img ? '<img src="' + esc(img) + '" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display=\'none\'">' : '') + '</div>'
         + '<div style="flex:1;min-width:0;">'
         + '<div style="font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(title) + '</div>'
         + '<div style="font-size:13px;color:#1a9d54;font-weight:600;">' + esc([price, mi].filter(Boolean).join(' · ')) + '</div>'
         + '<div style="font-size:12px;color:var(--gray);">' + esc(ds) + '</div>'
         + '</div>'
         + '<button class="btn btn-primary" data-open="' + e.id + '" style="flex:none;">Open</button>'
-        + '<button data-del="' + e.id + '" title="Delete" aria-label="Delete listing" style="flex:none;background:none;border:0;color:#b0b0b5;font-size:18px;cursor:pointer;">🗑️</button>'
+        + '<button data-del="' + e.id + '" title="Delete" aria-label="Delete listing" style="flex:none;background:none;border:0;color:#b0b0b5;font-size:18px;cursor:pointer;padding:8px;min-width:36px;min-height:36px;">🗑️</button>'
         + '</div>';
     }).join('');
     wrap.querySelectorAll('[data-open]').forEach(b => b.addEventListener('click', () => openHistory(Number(b.getAttribute('data-open')))));
@@ -1889,7 +1895,7 @@
         ${vids.map((u, i) => `<a href="${escAttr(u)}" target="_blank" rel="noopener" style="color: var(--accent); font-weight: 600;">video ${i + 1} ↗</a>`).join(' · ')}
       </div>`;
       imagesHtml = imageUrls.length === 0 ? '' : `<div style="margin-bottom: 24px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px;">
           <p style="font-size: 12px; color: var(--gray); margin: 0;">Car photos (from dealership) — save them, then attach to your post</p>
           <span style="display:flex; gap:6px;">
             <button id="shareAllBtn" class="btn btn-ghost" style="font-size: 12px; padding: 6px 12px; display: none;">📲 Save to phone</button>
@@ -2140,7 +2146,7 @@
     strip.innerHTML = imgs.map((u, i) =>
       '<div style="position:relative;width:56px;height:56px;border-radius:8px;overflow:hidden;border:1px solid var(--line,#e6e6e8);">'
       + '<img src="' + u + '" style="width:100%;height:100%;object-fit:cover;">'
-      + '<button data-rm="' + i + '" aria-label="Remove photo" style="position:absolute;top:0;right:0;background:rgba(0,0,0,.6);color:#fff;border:0;width:18px;height:18px;font-size:12px;line-height:1;cursor:pointer;">×</button>'
+      + '<button data-rm="' + i + '" aria-label="Remove photo" style="position:absolute;top:0;right:0;background:rgba(0,0,0,.6);color:#fff;border:0;width:24px;height:24px;font-size:14px;line-height:1;cursor:pointer;">×</button>'
       + '</div>').join('');
     strip.querySelectorAll('[data-rm]').forEach(b => b.addEventListener('click', () => {
       const i = Number(b.getAttribute('data-rm'));
