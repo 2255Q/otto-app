@@ -2183,6 +2183,7 @@
 
       const per = 2200, fade = 450;
       const drawCover = (im, alpha, zoom) => {
+        if (!im || !im.width) return;
         const ir = im.width / im.height, cr = W / H; let dw, dh;
         if (ir > cr) { dh = H * zoom; dw = dh * ir; } else { dw = W * zoom; dh = dw / ir; }
         ctx.globalAlpha = alpha; ctx.drawImage(im, (W - dw) / 2, (H - dh) / 2, dw, dh); ctx.globalAlpha = 1;
@@ -2201,23 +2202,27 @@
       };
 
       const start = performance.now(); const total = imgs.length * per;
+      let frameErr = null;
       await new Promise(resolve => {
         function frame(now) {
-          const t = now - start; if (t >= total) { resolve(); return; }
-          const idx = Math.min(imgs.length - 1, Math.floor(t / per));
-          const localT = t - idx * per;
-          ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
-          drawCover(imgs[idx], 1, 1.06 + 0.10 * (localT / per));
-          if (idx < imgs.length - 1 && localT > per - fade) {
-            drawCover(imgs[idx + 1], (localT - (per - fade)) / fade, 1.06);
-          }
-          overlay();
-          requestAnimationFrame(frame);
+          try {
+            const t = Math.max(0, now - start); if (t >= total) { resolve(); return; }
+            const idx = Math.max(0, Math.min(imgs.length - 1, Math.floor(t / per)));
+            const localT = t - idx * per;
+            ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+            drawCover(imgs[idx], 1, 1.06 + 0.10 * (localT / per));
+            if (idx < imgs.length - 1 && localT > per - fade) {
+              drawCover(imgs[idx + 1], (localT - (per - fade)) / fade, 1.06);
+            }
+            overlay();
+            requestAnimationFrame(frame);
+          } catch (err) { frameErr = err; resolve(); }
         }
         requestAnimationFrame(frame);
       });
       rec.stop();
       await stopped;
+      if (frameErr) throw frameErr;
 
       const ext = mime.includes('mp4') ? 'mp4' : 'webm';
       const blob = new Blob(chunks, { type: mime || 'video/webm' });
